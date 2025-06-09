@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -14,3 +8,105 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id          Int         @id @default(autoincrement())
+  fullName    String
+  username    String      @unique
+  email       String      @unique
+  password    String
+  bio         String?
+  profilePic  String?
+  accountType AccountType
+  createdAt   DateTime    @default(now())
+
+  followers        Follow[]  @relation("UserFollowers")
+  following        Follow[]  @relation("UserFollowing")
+  sentRequests     Request[] @relation("SentRequests")
+  receivedRequests Request[] @relation("ReceivedRequests")
+  like             Like[]
+  comments         Comment[]
+  posts            Post[]
+}
+
+model Post {
+  id        Int       @id @default(autoincrement())
+  type      PostType
+  mediaUrl  String?
+  caption   String?
+  comments  Comment[]
+  likes     Like[]
+  authorId  Int
+  author    User      @relation(fields: [authorId], references: [id])
+  createdAt DateTime  @default(now())
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id])
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id])
+  likes     Like[]
+  createdAt DateTime @default(now())
+}
+
+model Like {
+  id        Int      @id @default(autoincrement())
+  authorId  Int
+  author    User     @relation(fields: [authorId], references: [id])
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id])
+  commentId Int?
+  comment   Comment? @relation(fields: [commentId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Follow {
+  id          Int      @id @default(autoincrement())
+  followerId  Int
+  followingId Int
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("UserFollowing", fields: [followerId], references: [id])
+  following User @relation("UserFollowers", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+}
+
+model Request {
+  id        Int           @id @default(autoincrement())
+  intention IntentionType
+  to        Int
+  toUser    User          @relation("ReceivedRequests", fields: [to], references: [id])
+  from      Int
+  fromUser  User          @relation("SentRequests", fields: [from], references: [id])
+  status    RequestType
+  createdAt DateTime @default(now())
+}
+
+enum IntentionType {
+  Friendship
+  Dating
+  Networking
+  Open
+  Omegle
+  Unspecified
+}
+
+enum RequestType {
+  Accepted
+  Rejected
+  Pending
+}
+
+enum AccountType {
+  Public
+  Private
+}
+
+enum PostType {
+  Image
+  Video
+  Tweet
+}

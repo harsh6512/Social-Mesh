@@ -16,8 +16,10 @@ model User {
   password    String
   bio         String?
   profilePic  String?
+  dateOfBirth DateTime?
   accountType AccountType
   createdAt   DateTime    @default(now())
+  updatedAt DateTime @updatedAt
 
   followers        Follow[]  @relation("UserFollowers")
   following        Follow[]  @relation("UserFollowing")
@@ -38,6 +40,7 @@ model Post {
   authorId  Int
   author    User      @relation(fields: [authorId], references: [id])
   createdAt DateTime  @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Comment {
@@ -49,6 +52,7 @@ model Comment {
   post      Post     @relation(fields: [postId], references: [id])
   likes     Like[]
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Like {
@@ -83,6 +87,7 @@ model Request {
   fromUser  User          @relation("SentRequests", fields: [from], references: [id])
   status    RequestType
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum IntentionType {

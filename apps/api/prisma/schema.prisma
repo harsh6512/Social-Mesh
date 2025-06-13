@@ -13,15 +13,27 @@ model User {
   fullName     String
   username     String       @unique
   email        String       @unique
-  password     String?
-  bio          String?
-  profilePic   String?
   dateOfBirth  DateTime?
-  accountType  AccountType
+  password     String?
+  google_id    String?      @unique
+  refreshToken String?
   provider     ProviderType
-  refreshToken String? 
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+
+  profile Profile?
+}
+
+model Profile {
+  id          Int         @id @default(autoincrement())
+  bio         String?
+  profilePic  String?
+  accountType AccountType
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int  @unique
 
   followers        Follow[]  @relation("UserFollowers")
   following        Follow[]  @relation("UserFollowing")
@@ -32,6 +44,31 @@ model User {
   posts            Post[]
 }
 
+// model User {
+//   id           Int          @id @default(autoincrement())
+//   fullName     String
+//   username     String       @unique
+//   email        String       @unique
+//   password     String?
+//   bio          String?
+//   profilePic   String?
+//   dateOfBirth  DateTime?
+//   accountType  AccountType
+//   provider     ProviderType
+//   google_id    String? @unique
+//   refreshToken String? 
+//   createdAt    DateTime     @default(now())
+//   updatedAt    DateTime     @updatedAt
+
+//   followers        Follow[]  @relation("UserFollowers")
+//   following        Follow[]  @relation("UserFollowing")
+//   sentRequests     Request[] @relation("SentRequests")
+//   receivedRequests Request[] @relation("ReceivedRequests")
+//   like             Like[]
+//   comments         Comment[]
+//   posts            Post[]
+// }
+
 model Post {
   id        Int       @id @default(autoincrement())
   type      PostType
@@ -40,7 +77,7 @@ model Post {
   comments  Comment[]
   likes     Like[]
   authorId  Int
-  author    User      @relation(fields: [authorId], references: [id])
+  author    Profile   @relation(fields: [authorId], references: [id])
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
@@ -49,7 +86,7 @@ model Comment {
   id        Int      @id @default(autoincrement())
   content   String
   authorId  Int
-  author    User     @relation(fields: [authorId], references: [id])
+  author    Profile  @relation(fields: [authorId], references: [id])
   postId    Int
   post      Post     @relation(fields: [postId], references: [id])
   likes     Like[]
@@ -60,7 +97,7 @@ model Comment {
 model Like {
   id        Int      @id @default(autoincrement())
   authorId  Int
-  author    User     @relation(fields: [authorId], references: [id])
+  author    Profile  @relation(fields: [authorId], references: [id])
   postId    Int
   post      Post     @relation(fields: [postId], references: [id])
   commentId Int?
@@ -74,8 +111,8 @@ model Follow {
   followingId Int
   createdAt   DateTime @default(now())
 
-  follower  User @relation("UserFollowing", fields: [followerId], references: [id])
-  following User @relation("UserFollowers", fields: [followingId], references: [id])
+  follower  Profile @relation("UserFollowing", fields: [followerId], references: [id])
+  following Profile @relation("UserFollowers", fields: [followingId], references: [id])
 
   @@unique([followerId, followingId])
 }
@@ -84,9 +121,9 @@ model Request {
   id        Int           @id @default(autoincrement())
   intention IntentionType
   to        Int
-  toUser    User          @relation("ReceivedRequests", fields: [to], references: [id])
+  toUser    Profile       @relation("ReceivedRequests", fields: [to], references: [id])
   from      Int
-  fromUser  User          @relation("SentRequests", fields: [from], references: [id])
+  fromUser  Profile       @relation("SentRequests", fields: [from], references: [id])
   status    RequestType
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt

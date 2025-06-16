@@ -1,5 +1,6 @@
 import { Router } from "express";
 import passport from "passport";
+import { signup } from "../controllers/user.controller.js";
 const router=Router()
  
 // router.get('/auth/google',
@@ -10,5 +11,5 @@ const router=Router()
 // successRedirect:'',
 // failureRedirect:'',
 // }))
-
+router.post("/signup",signup)
 export default router

@@ -1,16 +1,144 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { signupSchema } from "@repo/common/schemas";
+import { comparePassword, hashPassword } from "../services/bcrypt.service.js";
+import { signupSchema, signinSchema } from "@repo/common/schemas";
 import { Request, Response } from "express"
 import { prisma } from "../db/index.js"
 import { formatZodErrors } from "../utils/zodErrorFormatter.js";
-
+import { generateAccessAndRefreshTokens } from "../services/jwt.service.js";
+import { sanitizeUser } from "../utils/sanitizeUser.js";
+import { CookieOptions } from "express";
+import { AuthenticatedRequest } from "../types/authenticatedRequest.js";
 
 const signup = asyncHandler(async (req: Request, res: Response) => {
-   
+    const userInput = req.body
+    const result = signupSchema.safeParse(userInput)
+    if (!result.success) {
+        const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
+        const errorMessages = formatZodErrors(formattedErrors);
+        throw new ApiError(400, "Inputs are not correct", errorMessages)
+    }
+
+    const existedUser = await prisma.user.findFirst({
+        where: {
+            OR: [
+                { email: userInput.email },
+                { username: userInput.username }
+            ],
+        },
+    });
+
+    if (existedUser) {
+        throw new ApiError(409, "User with the given username or email already exist")
+    }
+
+    const hashedPassword = await hashPassword(userInput.password)
+
+    const user = await prisma.user.create({
+        data: {
+            fullName: userInput.fullName,
+            username: userInput.username,
+            email: userInput.email,
+            dateOfBirth: userInput.dateOfBirth,
+            password: hashedPassword,
+            provider: "Credentials",
+        }
+    })
+
+    if (!user) {
+        throw new ApiError(500, "Something Went wrong while siging up")
+    }
+
+    const safeUser = sanitizeUser(user)
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(safeUser)
+
+
+    const options: CookieOptions = {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    }
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new ApiResponse(200, safeUser, "User signed up successfully")
+        )
+
+})
+
+const signin = asyncHandler(async (req: Request, res: Response) => {
+    const userInput = req.body
+    const result = signinSchema.safeParse(userInput)
+    if (!result.success) {
+        const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
+        const errorMessages = formatZodErrors(formattedErrors);
+        throw new ApiError(400, "Inputs are not correct", errorMessages)
+    }
+
+    const user = await prisma.user.findUnique({
+        where: {
+            username: userInput.username
+        }
+    });
+
+    if (!user) {
+        throw new ApiError(404, "User with the given username doesn't exist")
+    }
+
+    if (!user.password) {
+        throw new ApiError(400, "This account was created using Google. Please sign in using Google.");
+    }
+
+    const isPasswordCorrect = await comparePassword(userInput.password, user.password)
+
+    if (!isPasswordCorrect) {
+        throw new ApiError(401, "Password for the given username is incorrect")
+    }
+
+    const safeUser = sanitizeUser(user)
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(safeUser)
+
+    const options: CookieOptions = {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new ApiResponse(200, safeUser, "User signed in successfully")
+        );
+})
+
+const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    await await prisma.user.update({
+        where: { id: req.user.id },
+        data: { refreshToken: null }
+    })
+
+    const options: CookieOptions = {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+    }
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, {}, "User logged out successfully"))
 })
 
 export {
-    signup
+    signup,
+    signin,
+    logout,
 }

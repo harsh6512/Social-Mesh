@@ -7,8 +7,8 @@ class ApiError<T = null> extends Error {
   constructor(
     statusCode: number,
     message = "Something went wrong",
-    data: T | null = null,
     errors: { field: string; message: string }[] = [],
+    data: T | null = null,
     stack = ""
   ) {
     super(message);

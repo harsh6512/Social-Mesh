@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { prisma } from "../db/index.js"
 import { ENV } from "../constants/env.js";
 import { Request,Response,NextFunction } from "express"
+import { sanitizeUser } from "../utils/sanitizeUser.js";
 
 export const verifyJWT = asyncHandler(async (req:Request, _:Response, next:NextFunction) => {
     try {
@@ -13,7 +14,6 @@ export const verifyJWT = asyncHandler(async (req:Request, _:Response, next:NextF
         }
 
         const decoded = jwt.verify(token, ENV.ACCESS_TOKEN_SECRET);
-
         if (typeof decoded !== "object" || !("id" in decoded)) {
             throw new ApiError(401, "Invalid token payload");
         }
@@ -29,10 +29,8 @@ export const verifyJWT = asyncHandler(async (req:Request, _:Response, next:NextF
         if (!user) {
             throw new ApiError(401, "Invalid Access Token")
         }
-        delete user.password;
-        delete user.refreshToken;
-
-        req.user = user;
+        const safeUser=sanitizeUser(user)
+        req.user = safeUser;
         next();
     } catch (error: unknown) {
 

@@ -3,14 +3,15 @@ import cors from 'cors'
 // import passport from 'passport'
 // import './services/passport.service.js'
 import { errorHandler } from './middlewares/errorHandler.middleware.js'
-
+import cookieParser from 'cookie-parser';
 const app = express();
 
 app.use(express.json());
 app.use(cors({
     origin: process.env.CORS_ORIGIN,
     credentials: true
-}))
+}));
+app.use(cookieParser());
 // app.use(passport.initialize())
 
 import userRouter from "./routes/user.routes.js"

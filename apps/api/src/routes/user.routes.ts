@@ -1,8 +1,13 @@
 import { Router } from "express";
-import passport from "passport";
-import { signup } from "../controllers/user.controller.js";
-const router=Router()
- 
+// import passport from "passport";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
+import {
+    signup,
+    signin,
+    logout,
+} from "../controllers/user.controller.js";
+const router = Router()
+
 // router.get('/auth/google',
 //   passport.authenticate('google', { scope: ['profile', 'email'] })
 // )
@@ -11,5 +16,7 @@ const router=Router()
 // successRedirect:'',
 // failureRedirect:'',
 // }))
-router.post("/signup",signup)
+router.route("/signup").post(signup)
+router.route("/signin").post(signin)
+router.route("/logout").post(verifyJWT,logout)
 export default router

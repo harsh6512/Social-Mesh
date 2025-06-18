@@ -137,10 +137,6 @@ const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => 
         .json(new ApiResponse(200, {}, "User logged out successfully"))
 })
 
-const forgetPassword=asyncHandler(async(req:Request,res:Response)=>{
-
-})
-
 export {
     signup,
     signin,

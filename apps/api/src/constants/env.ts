@@ -5,7 +5,7 @@ const getEnv = (key: string, defaultValue?: string): string => {
     throw Error(`Missing String environment variable for ${key}`);
   }
 
-  return value; 
+  return value;
 };
 
 export const ENV = {
@@ -21,6 +21,9 @@ export const ENV = {
 
   ACCESS_TOKEN_SECRET: getEnv("ACCESS_TOKEN_SECRET"),
   ACCESS_TOKEN_EXPIRY: getEnv("ACCESS_TOKEN_EXPIRY"),
-  REFRESH_TOKEN_SECRET:getEnv("REFRESH_TOKEN_SECRET"),
-  REFRESH_TOKEN_EXPIRY:getEnv("REFRESH_TOKEN_EXPIRY"),
+  REFRESH_TOKEN_SECRET: getEnv("REFRESH_TOKEN_SECRET"),
+  REFRESH_TOKEN_EXPIRY: getEnv("REFRESH_TOKEN_EXPIRY"),
+  REDIS_HOST: getEnv("REDIS_HOST","localhost"),
+  REDIS_PORT: getEnv("REDIS_PORT","6379"),
+  REDIS_PASSWORD:getEnv("REDIS_PASSWORD",undefined),
 };

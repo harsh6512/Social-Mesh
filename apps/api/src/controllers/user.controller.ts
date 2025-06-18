@@ -9,7 +9,7 @@ import { formatZodErrors } from "../utils/zodErrorFormatter.js";
 import { generateAccessAndRefreshTokens } from "../services/jwt.service.js";
 import { sanitizeUser } from "../utils/sanitizeUser.js";
 import { CookieOptions } from "express";
-import { AuthenticatedRequest } from "../types/authenticatedRequest.js";
+import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
 
 const signup = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
@@ -135,6 +135,10 @@ const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => 
         .clearCookie("accessToken", options)
         .clearCookie("refreshToken", options)
         .json(new ApiResponse(200, {}, "User logged out successfully"))
+})
+
+const forgetPassword=asyncHandler(async(req:Request,res:Response)=>{
+
 })
 
 export {

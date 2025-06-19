@@ -28,7 +28,7 @@ const generateRefreshToken = (user: RefreshTokenPayload)
   const expiry = ENV.ACCESS_TOKEN_EXPIRY as "7d" | "30d" | "90d"
   return jwt.sign(
     {
-      _id: user.id
+      id: user.id
     },
     ENV.REFRESH_TOKEN_SECRET,
     {
@@ -36,6 +36,22 @@ const generateRefreshToken = (user: RefreshTokenPayload)
     }
   )
 }
+
+type ForgotPasswordPayload=Pick<User,"email">;
+
+const generateForgotPasswordToken=(user:ForgotPasswordPayload):string=>{
+  const expiry=ENV.FORGOTPASSWORD_TOKEN_EXPIRY as "5m"| "10m" |"15m"
+  return jwt.sign(
+    {
+      email:user.email
+    },
+    ENV.FORGOTPASSWORD_TOKEN_SECRET,
+    {
+      expiresIn:expiry
+    }
+  )
+}
+
 const generateAccessAndRefreshTokens = async (
   user: AccessTokenPayload
 ): Promise<{ accessToken: string; refreshToken: string }> => {
@@ -54,4 +70,5 @@ export {
   generateAccessToken,
   generateRefreshToken,
   generateAccessAndRefreshTokens,
+  generateForgotPasswordToken,
 }

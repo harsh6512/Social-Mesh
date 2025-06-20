@@ -1,21 +1,37 @@
+import { CookieOptions, Request, Response } from "express";
+import jwt from "jsonwebtoken";
+
+import { ENV } from "../constants/env.js";
+
+import { prisma } from "../db/index.js";
+import { redis } from "../lib/redis.js";
+
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { comparePassword, hashPassword } from "../services/bcrypt.service.js";
-import { signupSchema, signinSchema, forgetPasswordSchema, OTPSchema, passwordSchema, updateUserDetailsSchema } from "@repo/common/schemas";
-import { Request, response, Response } from "express"
-import { prisma } from "../db/index.js"
 import { formatZodErrors } from "../utils/zodErrorFormatter.js";
-import { generateAccessAndRefreshTokens, generateForgotPasswordToken } from "../services/jwt.service.js";
 import { sanitizeUser } from "../utils/sanitizeUser.js";
-import { CookieOptions } from "express";
-import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
-import { sendMail } from "../services/mail.service.js";
-import { redis } from "../lib/redis.js";
-import { generateOTP } from "../services/auth.service.js";
-import jwt from "jsonwebtoken";
-import { ENV } from "../constants/env.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+
+import {
+  generateAccessAndRefreshTokens,
+  generateForgotPasswordToken
+} from "../services/jwt.service.js";
+
+import { generateOTP } from "../services/auth.service.js";
+import { comparePassword, hashPassword } from "../services/bcrypt.service.js";
+import { sendMail } from "../services/mail.service.js";
+
+import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
+
+import {
+  forgetPasswordSchema,
+  OTPSchema,
+  passwordSchema,
+  signinSchema,
+  signupSchema,
+  updateUserDetailsSchema
+} from "@repo/common/schemas";
 
 
 const signup = asyncHandler(async (req: Request, res: Response) => {

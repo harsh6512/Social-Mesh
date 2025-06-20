@@ -2,7 +2,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { comparePassword, hashPassword } from "../services/bcrypt.service.js";
-import { signupSchema, signinSchema, forgetPasswordSchema, OTPSchema, passwordSchema } from "@repo/common/schemas";
+import { signupSchema, signinSchema, forgetPasswordSchema, OTPSchema, passwordSchema, updateUserDetailsSchema } from "@repo/common/schemas";
 import { Request, response, Response } from "express"
 import { prisma } from "../db/index.js"
 import { formatZodErrors } from "../utils/zodErrorFormatter.js";
@@ -14,6 +14,9 @@ import { sendMail } from "../services/mail.service.js";
 import { redis } from "../lib/redis.js";
 import { generateOTP } from "../services/auth.service.js";
 import jwt from "jsonwebtoken";
+import { ENV } from "../constants/env.js";
+import { uploadOnCloudinary } from "../utils/cloudinary.js";
+
 
 const signup = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
@@ -46,12 +49,13 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
             email: userInput.email,
             dateOfBirth: userInput.dateOfBirth,
             password: hashedPassword,
+            gender: userInput.gender,
             provider: "Credentials",
         }
     })
 
     if (!user) {
-        throw new ApiError(500, "Something Went wrong while siging up")
+        throw new ApiError(500, "Something Went wrong while signing up")
     }
 
     const safeUser = sanitizeUser(user)
@@ -247,11 +251,11 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
 
     const hashedPassword = await hashPassword(userInput.password)
 
-    const user=await prisma.user.update({
+    const user = await prisma.user.update({
         where: { email },
         data: { password: hashedPassword },
     });
-    const safeUser=sanitizeUser(user)
+    const safeUser = sanitizeUser(user)
     await redis.del(`otp-verified:${email}`);
     await redis.del(`forgot-password:${email}`);
 
@@ -262,10 +266,98 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
     }
 
     return res
-    .status(200)
-    .clearCookie("forgotPasswordToken",options)
-    .json(new ApiResponse(200,safeUser,"Your password has been reset successfully"))
+        .status(200)
+        .clearCookie("forgotPasswordToken", options)
+        .json(new ApiResponse(200, safeUser, "Your password has been reset successfully"))
 })
+
+const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
+    const token = req.cookies?.refreshToken
+    if (!token) {
+        throw new ApiError(401, "Unauthorized Request")
+    }
+
+    try {
+        const decodedToken = jwt.verify(token, ENV.REFRESH_TOKEN_SECRET) as jwt.JwtPayload
+        if (typeof decodedToken !== "object" || !("id" in decodedToken)) {
+            throw new ApiError(401, "Invalid token payload");
+        }
+
+        const user = await prisma.user.findUnique({
+            where: {
+                id: decodedToken.id
+            },
+        });
+
+        if (token != user?.refreshToken) {
+            throw new ApiError(401, "Refresh token is expired or used")
+        }
+
+        const safeUser = sanitizeUser(user)
+        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(safeUser)
+
+        const options: CookieOptions = {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+        };
+
+        return res
+            .status(200)
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", refreshToken, options)
+            .json(
+                new ApiResponse(200, safeUser, "Acces Token Refreshed")
+            );
+
+    } catch (error: any) {
+        throw new ApiError(401, error?.message || "Invalid refresh token")
+    }
+})
+
+const getCurrentUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    return res
+        .status(200)
+        .json(new ApiResponse(200, req.user, "User fetched Successfully"))
+})
+
+const updateUserDetails = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userInput = req.body;
+    const result = updateUserDetailsSchema.safeParse(userInput);
+    if (!result.success) {
+        const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
+        const errorMessages = formatZodErrors(formattedErrors);
+        throw new ApiError(400, "Inputs are not correct", errorMessages);
+    }
+
+    const [emailExists, usernameExists] = await Promise.all([
+        prisma.user.findUnique({ where: { email: userInput.email } }),
+        prisma.user.findUnique({ where: { username: userInput.username } })
+    ]);
+
+    if (emailExists && emailExists.id !== req.user.id) {
+        throw new ApiError(409, "Email is already in use");
+    }
+
+    if (usernameExists && usernameExists.id !== req.user.id) {
+        throw new ApiError(409, "Username is already taken");
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+    const user = await prisma.user.update({
+        where: { id: req.user.id },
+        data: {
+            email: userInput.email ?? existingUser.email,
+            username: userInput.username ?? existingUser.username,
+            fullName: userInput.fullName ?? existingUser.fullName,
+            dateOfBirth:userInput.dateOfBirth ?? existingUser.dateOfBirth
+        }
+    });
+    const updatedUser = sanitizeUser(user)
+
+    return res.status(200).json(new ApiResponse(200, updatedUser, "User updated successfully"));
+});
 
 export {
     signup,
@@ -274,4 +366,7 @@ export {
     forgotPassword,
     verifyOTP,
     resetPassword,
+    refreshAccessToken,
+    getCurrentUser,
+    updateUserDetails
 }

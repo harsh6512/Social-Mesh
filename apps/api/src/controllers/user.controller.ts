@@ -11,11 +11,10 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { formatZodErrors } from "../utils/zodErrorFormatter.js";
 import { sanitizeUser } from "../utils/sanitizeUser.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
 
 import {
-  generateAccessAndRefreshTokens,
-  generateForgotPasswordToken
+    generateAccessAndRefreshTokens,
+    generateForgotPasswordToken
 } from "../services/jwt.service.js";
 
 import { generateOTP } from "../services/auth.service.js";
@@ -24,19 +23,12 @@ import { sendMail } from "../services/mail.service.js";
 
 import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
 
-import {
-  forgetPasswordSchema,
-  OTPSchema,
-  passwordSchema,
-  signinSchema,
-  signupSchema,
-  updateUserDetailsSchema
-} from "@repo/common/schemas";
+import { UserSchemas } from "@repo/common/schemas";
 
 
 const signup = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
-    const result = signupSchema.safeParse(userInput)
+    const result = UserSchemas.signupSchema.safeParse(userInput)
     if (!result.success) {
         const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
         const errorMessages = formatZodErrors(formattedErrors);
@@ -97,7 +89,7 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
 
 const signin = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
-    const result = signinSchema.safeParse(userInput)
+    const result = UserSchemas.signinSchema.safeParse(userInput)
     if (!result.success) {
         const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
         const errorMessages = formatZodErrors(formattedErrors);
@@ -163,7 +155,7 @@ const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => 
 
 const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
-    const result = forgetPasswordSchema.safeParse(userInput)
+    const result = UserSchemas.forgotPasswordSchema.safeParse(userInput)
     if (!result.success) {
         const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
         const errorMessages = formatZodErrors(formattedErrors);
@@ -226,7 +218,7 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
 
 const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
-    const result = OTPSchema.safeParse(userInput)
+    const result = UserSchemas.OTPSchema.safeParse(userInput)
     if (!result.success) {
         const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
         const errorMessages = formatZodErrors(formattedErrors);
@@ -258,7 +250,7 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
     }
 
     const userInput = req.body
-    const result = passwordSchema.safeParse(userInput)
+    const result = UserSchemas.passwordSchema.safeParse(userInput)
     if (!result.success) {
         const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
         const errorMessages = formatZodErrors(formattedErrors);
@@ -340,7 +332,7 @@ const getCurrentUser = asyncHandler(async (req: AuthenticatedRequest, res: Respo
 
 const updateUserDetails = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userInput = req.body;
-    const result = updateUserDetailsSchema.safeParse(userInput);
+    const result = UserSchemas.updateUserDetailsSchema.safeParse(userInput);
     if (!result.success) {
         const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
         const errorMessages = formatZodErrors(formattedErrors);
@@ -367,7 +359,7 @@ const updateUserDetails = asyncHandler(async (req: AuthenticatedRequest, res: Re
             email: userInput.email ?? existingUser.email,
             username: userInput.username ?? existingUser.username,
             fullName: userInput.fullName ?? existingUser.fullName,
-            dateOfBirth:userInput.dateOfBirth ?? existingUser.dateOfBirth
+            dateOfBirth: userInput.dateOfBirth ?? existingUser.dateOfBirth
         }
     });
     const updatedUser = sanitizeUser(user)

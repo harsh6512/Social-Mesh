@@ -15,8 +15,10 @@ app.use(cookieParser());
 // app.use(passport.initialize())
 
 import userRouter from "./routes/user.routes.js"
+import profileRouter from "./routes/profile.routes.js"
 
 app.use("/api/v1/users", userRouter)
+app.use("/api/v1/profiles", profileRouter)
 app.use(errorHandler)
 
 export { app };

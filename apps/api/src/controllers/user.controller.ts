@@ -353,6 +353,10 @@ const updateUserDetails = asyncHandler(async (req: AuthenticatedRequest, res: Re
     }
 
     const existingUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!existingUser) {
+        throw new ApiError(404, "Profile not found");
+    }
+
     const user = await prisma.user.update({
         where: { id: req.user.id },
         data: {

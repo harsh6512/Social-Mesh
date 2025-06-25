@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors'
-// import passport from 'passport'
-// import './services/passport.service.js'
+import passport from 'passport'
+import './lib/passport.js'
 import { errorHandler } from './middlewares/errorHandler.middleware.js'
 import cookieParser from 'cookie-parser';
 const app = express();
@@ -12,11 +12,14 @@ app.use(cors({
     credentials: true
 }));
 app.use(cookieParser());
-// app.use(passport.initialize())
+app.use(passport.initialize())
 
-import userRouter from "./routes/user.routes.js"
-import profileRouter from "./routes/profile.routes.js"
+import userRouter from './routes/user.routes.js'
+import profileRouter from './routes/profile.routes.js';
+import authRouter from './routes/auth.routes.js';
 
+
+app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/profiles", profileRouter)
 app.use(errorHandler)

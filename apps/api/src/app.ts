@@ -23,12 +23,4 @@ app.use("/api/v1/users", userRouter)
 app.use("/api/v1/profiles", profileRouter)
 app.use(errorHandler)
 
-app.get('/', (req, res) => {
-  res.send(`
-    <h1>Welcome to Social Mesh</h1>
-    <a href="/api/v1/auth/google/signin">Sign in with Google</a>
-    <a href="/api/v1/auth/google/signup">Sign up with Google</a>
-  `);
-});
-
 export { app };

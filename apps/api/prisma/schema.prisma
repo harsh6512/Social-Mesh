@@ -13,7 +13,7 @@ model User {
   fullName     String
   username     String       @unique
   email        String       @unique
-  gender       GenderType
+  gender       GenderType?
   dateOfBirth  DateTime?
   password     String?
   google_id    String?      @unique

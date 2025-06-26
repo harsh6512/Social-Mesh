@@ -1,7 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { Request, response, Response } from "express"
+import { Request, Response } from "express"
 import { prisma } from "../db/index.js"
 import { formatZodErrors } from "../utils/zodErrorFormatter.js";
 import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";

@@ -1,9 +1,8 @@
 import {z} from 'zod'
 
 export const completeProfileSchema = z.object({
-  bio: z.string().optional(),
+  bio: z.string().max(300,"Bio is too long (maximum 300 characters)").optional(),
   profilePic: z.string().optional(),
-  accountType: z.enum(["Public", "Private"])
 })
 
 export type completeProfileData = z.infer<typeof completeProfileSchema>

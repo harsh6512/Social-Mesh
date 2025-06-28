@@ -11,6 +11,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { formatZodErrors } from "../utils/zodErrorFormatter.js";
 import { sanitizeUser } from "../utils/sanitizeUser.js";
+import { validationErrors } from "../utils/validationErrors.js";
 
 import {
     generateAccessAndRefreshTokens,
@@ -18,7 +19,7 @@ import {
 } from "../services/jwt.service.js";
 
 import { generateOTP } from "../services/auth.service.js";
-import {hashPassword } from "../services/bcrypt.service.js";
+import { hashPassword } from "../services/bcrypt.service.js";
 import { sendMail } from "../services/mail.service.js";
 
 import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
@@ -29,9 +30,7 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
     const result = UserSchemas.forgotPasswordSchema.safeParse(userInput)
     if (!result.success) {
-        const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
-        const errorMessages = formatZodErrors(formattedErrors);
-        throw new ApiError(400, "Inputs are not correct", errorMessages)
+        validationErrors(result)
     }
     const user = await prisma.user.findUnique({
         where: {
@@ -92,9 +91,7 @@ const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
     const result = UserSchemas.OTPSchema.safeParse(userInput)
     if (!result.success) {
-        const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
-        const errorMessages = formatZodErrors(formattedErrors);
-        throw new ApiError(400, "Inputs are not correct", errorMessages)
+        validationErrors(result)
     }
 
     const email = req.body.email;
@@ -206,9 +203,7 @@ const updateUserDetails = asyncHandler(async (req: AuthenticatedRequest, res: Re
     const userInput = req.body;
     const result = UserSchemas.updateUserDetailsSchema.safeParse(userInput);
     if (!result.success) {
-        const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
-        const errorMessages = formatZodErrors(formattedErrors);
-        throw new ApiError(400, "Inputs are not correct", errorMessages);
+        validationErrors(result)
     }
 
     const [emailExists, usernameExists] = await Promise.all([

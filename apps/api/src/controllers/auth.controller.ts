@@ -5,6 +5,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { sanitizeUser } from "../utils/sanitizeUser.js";
 import { formatZodErrors } from "../utils/zodErrorFormatter.js";
+import { validationErrors } from "../utils/validationErrors.js";
 
 import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
 
@@ -21,9 +22,7 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
     const result = AuthSchemas.signupSchema.safeParse(userInput)
     if (!result.success) {
-        const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
-        const errorMessages = formatZodErrors(formattedErrors);
-        throw new ApiError(400, "Inputs are not correct", errorMessages)
+        validationErrors(result)
     }
 
     const existedUser = await prisma.user.findFirst({
@@ -82,9 +81,7 @@ const signin = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
     const result = AuthSchemas.signinSchema.safeParse(userInput)
     if (!result.success) {
-        const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
-        const errorMessages = formatZodErrors(formattedErrors);
-        throw new ApiError(400, "Inputs are not correct", errorMessages)
+        validationErrors(result)
     }
 
     const user = await prisma.user.findUnique({

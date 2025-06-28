@@ -8,6 +8,7 @@ import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ProfileSchemas } from "@repo/common/schemas";
 import { sanitizeUser } from "../utils/sanitizeUser.js";
+import { validationErrors } from "../utils/validationErrors.js";
 
 const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { bio, accountType } = req.body ?? {}
@@ -15,9 +16,7 @@ const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Resp
   const userInput = { bio, accountType, profilePic };
   const result = ProfileSchemas.completeProfileSchema.safeParse(userInput)
   if (!result.success) {
-    const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
-    const errorMessages = formatZodErrors(formattedErrors);
-    throw new ApiError(400, "Inputs are not correct", errorMessages)
+    validationErrors(result)
   }
 
   const existingProfile = await prisma.profile.findUnique({
@@ -42,7 +41,6 @@ const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Resp
       userId: req.user.id,
       bio: userInput.bio,
       profilePic: profilePicUrl,
-      accountType: userInput.accountType,
     },
   });
 
@@ -61,9 +59,7 @@ const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response
   const userInput = { bio, accountType, profilePic };
   const result = ProfileSchemas.editProfileSchema.safeParse(userInput);
   if (!result.success) {
-    const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
-    const errorMessages = formatZodErrors(formattedErrors);
-    throw new ApiError(400, "Inputs are not correct", errorMessages);
+    validationErrors(result)
   }
 
   const existingProfile = await prisma.profile.findUnique({
@@ -88,7 +84,6 @@ const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response
     data: {
       bio: userInput.bio ?? existingProfile.bio,
       profilePic: profilePicUrl ?? existingProfile.profilePic,
-      accountType: userInput.accountType ?? existingProfile.accountType,
     },
   });
 
@@ -101,12 +96,9 @@ const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response
     .status(200)
     .json(new ApiResponse(200, safeProfile, "The profile was updated successfully"));
 });
-
-//public or private authenticated request or request
-const getprofile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+const oauthCompleteProfile = asyncHandler(async (req: AuthenticatedRequest, res) => {
 
 })
-
 export {
   completeProfile,
   editProfile,

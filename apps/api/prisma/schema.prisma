@@ -10,7 +10,7 @@ datasource db {
 
 model User {
   id           Int          @id @default(autoincrement())
-  fullName     String       @db.VarChar(100)  
+  fullName     String       @db.VarChar(100)
   username     String       @unique @db.VarChar(30)
   email        String       @unique @db.VarChar(255)
   gender       GenderType?
@@ -22,72 +22,72 @@ model User {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  profile Profile?
+  profile      Profile?
 }
 
 model Profile {
   id         Int      @id @default(autoincrement())
-  bio        String? @db.VarChar(300)
+  bio        String?  @db.VarChar(300)
   profilePic String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user   User @relation(fields: [userId], references: [id],onDelete:Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId Int  @unique
 
-  followers Follow[]  @relation("UserFollowers")
-  following Follow[]  @relation("UserFollowing")
-  comments  Comment[]
-  posts     Post[]
+  followers     Follow[]      @relation("UserFollowers")
+  following     Follow[]      @relation("UserFollowing")
+  comments      Comment[]
+  posts         Post[]
   likedComments CommentLike[]
-  likedPosts PostLike[]
+  likedPosts    PostLike[]
 }
 
 model Post {
-  id        Int       @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   type      PostType
   mediaUrl  String?
-  caption   String?  @db.Text
+  caption   String?    @db.Text
   comments  Comment[]
   authorId  Int
-  author    Profile   @relation(fields: [authorId], references: [id],onDelete: Cascade)
-  postLikes    PostLike[]    
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  author    Profile    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  postLikes PostLike[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 }
 
 model Comment {
-  id        Int      @id @default(autoincrement())
-  content   String  @db.Text
-  authorId  Int
-  author    Profile  @relation(fields: [authorId], references: [id],onDelete:Cascade )
-  postId    Int
-  post      Post     @relation(fields: [postId], references: [id],onDelete: Cascade)
+  id           Int           @id @default(autoincrement())
+  content      String        @db.Text
+  authorId     Int
+  author       Profile       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  postId       Int
+  post         Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
   commentLikes CommentLike[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model CommentLike {
   id        Int      @id @default(autoincrement())
   authorId  Int
-  author    Profile  @relation(fields: [authorId], references: [id],onDelete: Cascade)
+  author    Profile  @relation(fields: [authorId], references: [id], onDelete: Cascade)
   commentId Int
-  comment   Comment @relation(fields: [commentId], references: [id],onDelete: Cascade)
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  @@unique([authorId,commentId])
+  @@unique([authorId, commentId])
 }
 
-model PostLike{
-  id Int @id @default(autoincrement())
-  authorId Int
-  author Profile @relation(fields: [authorId],references: [id],onDelete: Cascade)
-  postId Int
-  post Post @relation(fields: [postId],references: [id],onDelete: Cascade)
+model PostLike {
+  id        Int      @id @default(autoincrement())
+  authorId  Int
+  author    Profile  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  @@unique([authorId,postId])
+  @@unique([authorId, postId])
 }
 
 model Follow {
@@ -97,10 +97,10 @@ model Follow {
   intention   IntentionType
   createdAt   DateTime      @default(now())
 
-  follower  Profile @relation("UserFollowing", fields: [followerId], references: [id],onDelete: Cascade)
-  following Profile @relation("UserFollowers", fields: [followingId], references: [id],onDelete: Cascade)
-  
-  @@unique([followerId, followingId])        
+  follower  Profile @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following Profile @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
 }
 
 enum ProviderType {

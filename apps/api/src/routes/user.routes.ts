@@ -11,7 +11,6 @@ import {
 } from "../controllers/user.controller.js";
 const router = Router()
 
-
 router.route("/forgot-password").post(forgotPassword)
 router.route("/verify-OTP").post(verifyForgotPasswordToken, verifyOTP)
 router.route("/reset-password").post(verifyForgotPasswordToken, resetPassword)

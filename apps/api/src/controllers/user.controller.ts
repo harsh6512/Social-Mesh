@@ -18,7 +18,7 @@ import {
 } from "../services/jwt.service.js";
 
 import { generateOTP } from "../services/auth.service.js";
-import { comparePassword, hashPassword } from "../services/bcrypt.service.js";
+import {hashPassword } from "../services/bcrypt.service.js";
 import { sendMail } from "../services/mail.service.js";
 
 import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";

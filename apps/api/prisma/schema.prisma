@@ -10,9 +10,9 @@ datasource db {
 
 model User {
   id           Int          @id @default(autoincrement())
-  fullName     String
-  username     String       @unique
-  email        String       @unique
+  fullName     String       @db.VarChar(100)  
+  username     String       @unique @db.VarChar(30)
+  email        String       @unique @db.VarChar(255)
   gender       GenderType?
   dateOfBirth  DateTime?
   password     String?
@@ -26,83 +26,81 @@ model User {
 }
 
 model Profile {
-  id          Int         @id @default(autoincrement())
-  bio         String?
-  profilePic  String?
-  accountType AccountType
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id         Int      @id @default(autoincrement())
+  bio        String? @db.VarChar(300)
+  profilePic String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  user   User @relation(fields: [userId], references: [id])
+  user   User @relation(fields: [userId], references: [id],onDelete:Cascade)
   userId Int  @unique
 
-  followers        Follow[]  @relation("UserFollowers")
-  following        Follow[]  @relation("UserFollowing")
-  sentRequests     Request[] @relation("SentRequests")
-  receivedRequests Request[] @relation("ReceivedRequests")
-  like             Like[]
-  comments         Comment[]
-  posts            Post[]
+  followers Follow[]  @relation("UserFollowers")
+  following Follow[]  @relation("UserFollowing")
+  comments  Comment[]
+  posts     Post[]
+  likedComments CommentLike[]
+  likedPosts PostLike[]
 }
 
 model Post {
   id        Int       @id @default(autoincrement())
   type      PostType
   mediaUrl  String?
-  caption   String?
+  caption   String?  @db.Text
   comments  Comment[]
-  likes     Like[]
   authorId  Int
-  author    Profile   @relation(fields: [authorId], references: [id])
+  author    Profile   @relation(fields: [authorId], references: [id],onDelete: Cascade)
+  postLikes    PostLike[]    
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
 
 model Comment {
   id        Int      @id @default(autoincrement())
-  content   String
+  content   String  @db.Text
   authorId  Int
-  author    Profile  @relation(fields: [authorId], references: [id])
+  author    Profile  @relation(fields: [authorId], references: [id],onDelete:Cascade )
   postId    Int
-  post      Post     @relation(fields: [postId], references: [id])
-  likes     Like[]
+  post      Post     @relation(fields: [postId], references: [id],onDelete: Cascade)
+  commentLikes CommentLike[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Like {
+model CommentLike {
   id        Int      @id @default(autoincrement())
   authorId  Int
-  author    Profile  @relation(fields: [authorId], references: [id])
-  postId    Int
-  post      Post     @relation(fields: [postId], references: [id])
-  commentId Int?
-  comment   Comment? @relation(fields: [commentId], references: [id])
+  author    Profile  @relation(fields: [authorId], references: [id],onDelete: Cascade)
+  commentId Int
+  comment   Comment @relation(fields: [commentId], references: [id],onDelete: Cascade)
   createdAt DateTime @default(now())
+
+  @@unique([authorId,commentId])
+}
+
+model PostLike{
+  id Int @id @default(autoincrement())
+  authorId Int
+  author Profile @relation(fields: [authorId],references: [id],onDelete: Cascade)
+  postId Int
+  post Post @relation(fields: [postId],references: [id],onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([authorId,postId])
 }
 
 model Follow {
-  id          Int      @id @default(autoincrement())
+  id          Int           @id @default(autoincrement())
   followerId  Int
   followingId Int
-  createdAt   DateTime @default(now())
+  intention   IntentionType
+  createdAt   DateTime      @default(now())
 
-  follower  Profile @relation("UserFollowing", fields: [followerId], references: [id])
-  following Profile @relation("UserFollowers", fields: [followingId], references: [id])
-
-  @@unique([followerId, followingId])
-}
-
-model Request {
-  id        Int           @id @default(autoincrement())
-  intention IntentionType
-  to        Int
-  toUser    Profile       @relation("ReceivedRequests", fields: [to], references: [id])
-  from      Int
-  fromUser  Profile       @relation("SentRequests", fields: [from], references: [id])
-  status    RequestType
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  follower  Profile @relation("UserFollowing", fields: [followerId], references: [id],onDelete: Cascade)
+  following Profile @relation("UserFollowers", fields: [followingId], references: [id],onDelete: Cascade)
+  
+  @@unique([followerId, followingId])        
 }
 
 enum ProviderType {
@@ -125,20 +123,8 @@ enum IntentionType {
   Unspecified
 }
 
-enum RequestType {
-  Accepted
-  Rejected
-  Pending
-}
-
-enum AccountType {
-  Public
-  Private
-}
-
 enum PostType {
   Image
   Video
   Tweet
 }
-

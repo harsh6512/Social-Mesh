@@ -28,20 +28,24 @@ import { UserSchemas } from "@repo/common/schemas";
 
 const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
-    const result = UserSchemas.forgotPasswordSchema.safeParse(userInput)
-    if (!result.success) {
-        validationErrors(result)
-    }
-    const user = await prisma.user.findUnique({
-        where: {
-            email: userInput.email
-        }
-    })
+
+    const [user, validationResult] = await Promise.all([
+        prisma.user.findUnique({
+            where: {
+                email: userInput.email
+            }
+        }),
+        UserSchemas.forgotPasswordSchema.safeParse(userInput)
+    ])
 
     if (!user) {
         throw new ApiError(404, "User with given email doesn't exist")
     }
     const safeUser = sanitizeUser(user)
+
+    if (!validationResult.success) {
+        validationErrors(validationResult)
+    }
 
     const rateLimitKey = `otp-requests:${safeUser.email}`;
     const currentCount = await redis.incr(rateLimitKey);
@@ -94,7 +98,7 @@ const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
         validationErrors(result)
     }
 
-    const email = req.body.email;
+    const email = userInput.email;
     const storedOtp = await redis.get(`forgot-password:${email}`);
     if (!storedOtp || storedOtp !== userInput.otp) {
         throw new ApiError(400, "Invalid or expired OTP");
@@ -112,18 +116,18 @@ const verifyOTP = asyncHandler(async (req: Request, res: Response) => {
 
 
 const resetPassword = asyncHandler(async (req: Request, res: Response) => {
-    const email = req.body.email
-    const isVerified = await redis.get(`otp-verified:${email}`)
-    if (!isVerified) {
-        throw new ApiError(403, "OTP not verified or session expired")
-    }
-
     const userInput = req.body
     const result = UserSchemas.passwordSchema.safeParse(userInput)
     if (!result.success) {
         const formattedErrors = result.error.format() as unknown as Record<string, { _errors: string[] }>;
         const errorMessages = formatZodErrors(formattedErrors);
         throw new ApiError(400, "Inputs are not correct", errorMessages)
+    }
+
+    const email = userInput.email
+    const isVerified = await redis.get(`otp-verified:${email}`)
+    if (!isVerified) {
+        throw new ApiError(403, "OTP not verified or session expired")
     }
 
     const hashedPassword = await hashPassword(userInput.password)

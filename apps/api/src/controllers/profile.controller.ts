@@ -3,28 +3,42 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Request, Response } from "express"
 import { prisma } from "../db/index.js"
-import { formatZodErrors } from "../utils/zodErrorFormatter.js";
 import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ProfileSchemas } from "@repo/common/schemas";
-import { sanitizeUser } from "../utils/sanitizeUser.js";
 import { validationErrors } from "../utils/validationErrors.js";
 
+
 const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { bio, accountType } = req.body ?? {}
+  const userId = req.user?.id
+
+  const bio = req.body ?? {}
   const profilePic = req.file?.path
-  const userInput = { bio, accountType, profilePic };
-  const result = ProfileSchemas.completeProfileSchema.safeParse(userInput)
-  if (!result.success) {
-    validationErrors(result)
+  const userInput = { bio, profilePic };
+  const [userWithProfile, validationResult] = await Promise.all([prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      provider: true,
+      profile: {
+        select: { id: true }
+      }
+    }
+  }),
+  ProfileSchemas.completeProfileSchema.safeParse(userInput)
+  ])
+
+  if (!userWithProfile || userWithProfile.provider !== "Credentials") {
+    throw new ApiError(403, "This route is only accessible for users who signed up with email/password");
   }
 
-  const existingProfile = await prisma.profile.findUnique({
-    where: { userId: req.user.id },
-  });
-
-  if (existingProfile) {
+  if (userWithProfile.profile) {
     throw new ApiError(400, "You have already completed your profile");
+  }
+
+
+  ProfileSchemas.completeProfileSchema.safeParse(userInput)
+  if (!validationResult.success) {
+    validationErrors(validationResult)
   }
 
   let profilePicUrl: string | null = null
@@ -38,7 +52,7 @@ const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Resp
 
   const profile = await prisma.profile.create({
     data: {
-      userId: req.user.id,
+      userId: userId,
       bio: userInput.bio,
       profilePic: profilePicUrl,
     },
@@ -54,20 +68,25 @@ const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Resp
 })
 
 const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { bio, accountType } = req.body ?? {}
-  const profilePic = req.file?.path
-  const userInput = { bio, accountType, profilePic };
-  const result = ProfileSchemas.editProfileSchema.safeParse(userInput);
-  if (!result.success) {
-    validationErrors(result)
-  }
+  const userId = req.user?.id
 
-  const existingProfile = await prisma.profile.findUnique({
-    where: { userId: req.user.id },
-  });
+  const { bio } = req.body ?? {}
+  const profilePic = req.file?.path
+  const userInput = { bio, profilePic };
+
+  const [existingProfile, validationResult] = await Promise.all([
+    prisma.profile.findUnique({
+      where: { userId: userId },
+    }),
+    ProfileSchemas.editProfileSchema.safeParse(userInput)
+  ])
 
   if (!existingProfile) {
     throw new ApiError(404, "Profile not found");
+  }
+
+  if (!validationResult.success) {
+    validationErrors(validationResult)
   }
 
   let profilePicUrl: string | null = null
@@ -80,7 +99,7 @@ const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response
   }
 
   const updatedProfile = await prisma.profile.update({
-    where: { userId: req.user.id },
+    where: { userId: userId},
     data: {
       bio: userInput.bio ?? existingProfile.bio,
       profilePic: profilePicUrl ?? existingProfile.profilePic,
@@ -91,15 +110,84 @@ const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response
     throw new ApiError(500, "Error while updating the profile");
   }
 
-  const safeProfile = sanitizeUser(updatedProfile);
   return res
     .status(200)
-    .json(new ApiResponse(200, safeProfile, "The profile was updated successfully"));
+    .json(new ApiResponse(200, updatedProfile, "The profile was updated successfully"));
 });
-const oauthCompleteProfile = asyncHandler(async (req: AuthenticatedRequest, res) => {
 
+const oauthCompleteProfile = asyncHandler(async (req: AuthenticatedRequest, res) => {
+  const userId = req.user?.id
+
+  const { bio, gender, dateOfBirth } = req.body;
+  const profilePic = req.file?.path;
+  const userInput = { bio, gender, dateOfBirth, profilePic };
+
+  const [userWithProfile, validationResult] = await Promise.all([
+    prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        provider: true,
+        profile: {
+          select: { id: true }
+        }
+      }
+    }),
+    ProfileSchemas.oauthCompleteProfileSchema.safeParse(userInput)
+  ])
+
+  if (!userWithProfile || userWithProfile.provider !== "Google") {
+    throw new ApiError(403, "Access denied: Google authentication required")
+  }
+
+  if (userWithProfile.profile) {
+    throw new ApiError(400, "You have already completed your profile")
+  }
+
+  if (!validationResult.success) {
+    validationErrors(validationResult)
+  }
+
+  let profilePicUrl: string | null = null
+  if (userInput.profilePic) {
+    const uploaded = await uploadOnCloudinary(userInput.profilePic)
+    if (!uploaded || !uploaded?.url) {
+      throw new ApiError(400, "Error while uploading the profile pic")
+    }
+    profilePicUrl = uploaded.url
+  }
+
+  const profile = await prisma.user.update({
+    where: {
+      id: userId
+    },
+    data: {
+      gender: userInput.gender,
+      dateOfBirth: userInput.dateOfBirth,
+      profile: {
+        create: {
+          bio: userInput.bio,
+          profilePic: profilePicUrl
+        }
+      }
+    },
+    include: {
+      profile: true,
+    }
+  })
+
+  if (!profile) {
+    throw new ApiError(500, "Error while completing the profile")
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, profile, "User profile completed successfully"))
 })
+
 export {
   completeProfile,
   editProfile,
+  oauthCompleteProfile,
 }

@@ -7,6 +7,7 @@ import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ProfileSchemas } from "@repo/common/schemas";
 import { validationErrors } from "../utils/validationErrors.js";
+import { profile } from "console";
 
 
 const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -99,7 +100,7 @@ const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response
   }
 
   const updatedProfile = await prisma.profile.update({
-    where: { userId: userId},
+    where: { userId: userId },
     data: {
       bio: userInput.bio ?? existingProfile.bio,
       profilePic: profilePicUrl ?? existingProfile.profilePic,
@@ -186,8 +187,93 @@ const oauthCompleteProfile = asyncHandler(async (req: AuthenticatedRequest, res)
     .json(new ApiResponse(200, profile, "User profile completed successfully"))
 })
 
+const getMYProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user?.id
+  const profile = await prisma.profile.findUnique({
+    where: {
+      userId: userId
+    },
+    select: {
+      bio: true,
+      profilePic: true,
+      user: {
+        select: {
+          fullName: true,
+          username: true,
+        }
+      },
+      _count: {
+        select: {
+          followers: true,
+          following: true,
+        }
+      }
+    }
+  })
+  if (!profile) {
+    throw new ApiError(404, "Profile not found")
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, profile, "Profile fetched successfully"))
+})
+
+const getPublicProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userIdParam = req.params.id
+  const currentUserId = req.user?.id
+
+  if (!userIdParam) {
+    throw new ApiError(400, "User ID is required")
+  }
+
+  const userId = parseInt(userIdParam)
+
+  const [profile, isFollower] = await Promise.all([
+    prisma.profile.findUnique({
+      where: {
+        userId: userId
+      },
+      select: {
+        bio: true,
+        profilePic: true,
+        user: {
+          select: {
+            fullName: true,
+            username: true,
+          }
+        },
+        _count: {
+          select: {
+            followers: true,
+            following: true,
+          }
+        }
+      }
+    }),
+    (currentUserId && currentUserId !== userId) ? prisma.follow.findFirst({
+      where: {
+        followerId: currentUserId,
+        followingId: userId
+      }
+    }) : null
+  ])
+  if (!profile) {
+    throw new ApiError(404, "Profile not found")
+  }
+
+  const data = {
+    ...profile,
+    isFollowing: currentUserId && currentUserId !== userId ? !!isFollower : false
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, data, "Profile fetched successfully"))
+})
+
 export {
   completeProfile,
   editProfile,
   oauthCompleteProfile,
+  getMYProfile,
+  getPublicProfile
 }

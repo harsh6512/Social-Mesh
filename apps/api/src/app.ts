@@ -17,10 +17,12 @@ app.use(passport.initialize())
 import userRouter from './routes/user.routes.js'
 import profileRouter from './routes/profile.routes.js';
 import authRouter from './routes/auth.routes.js';
+import followRouter from './routes/follow.routes.js'
 
 app.use("/api/v1/auth", authRouter)
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/profiles", profileRouter)
+app.use("/api/v1/connection",followRouter)
 app.use(errorHandler)
 
 export { app };

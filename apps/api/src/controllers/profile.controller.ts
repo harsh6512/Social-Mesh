@@ -13,7 +13,7 @@ import { profile } from "console";
 const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user?.id
 
-  const bio = req.body ?? {}
+  const bio = req.body.bio ?? {}
   const profilePic = req.file?.path
   const userInput = { bio, profilePic };
   const [userWithProfile, validationResult] = await Promise.all([prisma.user.findUnique({
@@ -36,8 +36,6 @@ const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Resp
     throw new ApiError(400, "You have already completed your profile");
   }
 
-
-  ProfileSchemas.completeProfileSchema.safeParse(userInput)
   if (!validationResult.success) {
     validationErrors(validationResult)
   }

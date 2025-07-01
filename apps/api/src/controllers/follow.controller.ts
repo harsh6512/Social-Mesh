@@ -88,11 +88,11 @@ const getFollowers = asyncHandler(async (req: AuthenticatedRequest, res: Respons
     const cursorParam = req.query.cursor as string | undefined;
     const userIdParam = req.params.id;
 
-    if (!userIdParam)  throw new ApiError(400, "User ID is required");
+    if (!userIdParam) throw new ApiError(400, "User ID is required");
 
     const userId = parseInt(userIdParam);
     if (isNaN(userId)) throw new ApiError(400, "Invalid user ID");
-    
+
 
     const cursor = cursorParam ? parseInt(cursorParam) : undefined;
     if (cursorParam && isNaN(cursor!)) throw new ApiError(400, "Invalid cursor");
@@ -158,11 +158,205 @@ const getFollowers = asyncHandler(async (req: AuthenticatedRequest, res: Respons
 });
 
 const getFollowing = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const cursorParam = req.query.cursor as string | undefined;
+    const userIdParam = req.params.id
 
+    if (!userIdParam) throw new ApiError(400, "User id is required")
+    const userId = parseInt(userIdParam)
+
+    const userProfile = await prisma.profile.findUnique({
+        where: { userId: userIdParam },
+        select: { id: true },
+    });
+    
+    if (isNaN(userId)) throw new ApiError(400, "Invalid user IDs")
+
+    const cursor = cursorParam ? parseInt(cursorParam) : undefined
+    if (cursor && isNaN(cursor)) throw new ApiError(400, "Invalid Cursor")
+
+    const following = await prisma.follow.findMany({
+        where: {
+            follower: {
+                userId,
+            }
+        },
+        take: limit + 1,
+        cursor: cursor ? { id: cursor } : undefined,
+        skip: cursor ? 1 : 0,
+        orderBy: {
+            id: 'asc',
+        },
+        select: {
+            id: true,
+            follower: {
+                select: {
+                    profilePic: true,
+                    user: {
+                        select: {
+                            fullName: true,
+                            username: true,
+                        },
+                    },
+                },
+            },
+        }
+    })
+
+    const hasMore = following.length > limit
+    const results = hasMore ? following.slice(0, limit) : following
+
+    type FollowingResult = {
+        id: number;
+        follower: {
+            profilePic: string | null;
+            user: {
+                fullName: string;
+                username: string;
+            };
+        };
+    };
+
+    const formattedFollowing = results.map((f: FollowingResult) => ({
+        id: f.id,
+        profilePic: f.follower?.profilePic,
+        fullName: f.follower?.user?.fullName,
+        username: f.follower?.user?.username
+    }));
+
+    const nextCursor = hasMore ? results[results.length - 1].id : null
+    return res
+        .status(200)
+        .json(new ApiResponse(200, { following: formattedFollowing, nextCursor, hasMore }, "User following fetched successfully"))
 })
+
+const removeFollower = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user.id;
+    const followerIdParams = req.params.id;
+
+    if (!followerIdParams) throw new ApiError(400, "Follower id is required");
+
+    const followerId = parseInt(followerIdParams);
+    if (isNaN(followerId)) throw new ApiError(400, "Invalid follower id");
+
+    const [followerProfile, userProfile] = await Promise.all([
+        prisma.profile.findUnique({
+            where: { userId: followerId },
+            select: { id: true }
+        }),
+        prisma.profile.findUnique({
+            where: { userId: userId },
+            select: { id: true }
+        })
+    ]);
+
+    if (!followerProfile || !userProfile) {
+        throw new ApiError(404, "Follower or user profile doesn't exist");
+    }
+
+    const result = await prisma.follow.deleteMany({
+        where: {
+            followerId: followerProfile.id,
+            followingId: userProfile.id,
+        }
+    });
+
+    if (result.count === 0) {
+        throw new ApiError(400, "This user is not following you");
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, {}, "The follower was removed successfully"));
+});
+
+const getFollowSuggestions = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user.id;
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const cursorParam = req.query.cursor as string | undefined;
+    const cursor = cursorParam ? parseInt(cursorParam) : undefined;
+
+    if (cursorParam && isNaN(cursor!)) throw new ApiError(400, "Invalid cursor");
+
+
+    const userProfile = await prisma.profile.findUnique({
+        where: { userId },
+        select: { id: true }
+    });
+
+    if (!userProfile) throw new ApiError(404, "User profile not found");
+
+    const suggestions = await prisma.profile.findMany({
+        take: limit + 1,
+        cursor: cursor ? { id: cursor } : undefined,
+        skip: cursor ? 1 : 0,
+        orderBy: { id: 'desc' },
+        where: {
+            userId: { not: userId },
+            NOT: {
+                followers: {
+                    some: {
+                        followerId: userProfile.id
+                    }
+                }
+            }
+        },
+        select: {
+            id: true,
+            profilePic: true,
+            user: {
+                select: {
+                    username: true,
+                    fullName: true,
+                }
+            }
+        },
+    });
+
+    const hasMore = suggestions.length > limit;
+    const results = hasMore ? suggestions.slice(0, limit) : suggestions;
+    const nextCursor = hasMore ? results[results.length - 1].id : null;
+
+    type suggestionsResult = {
+        id: number,
+        profilePic: string | null,
+        user: {
+            username: string,
+            fullName: string,
+        }
+    }
+
+    const formattedSuggestions = results.map((profile: suggestionsResult) => ({
+        id: profile.id,
+        profilePic: profile.profilePic,
+        fullName: profile.user.fullName,
+        username: profile.user.username
+    }));
+
+    return res.status(200).json(
+        new ApiResponse(200, {
+            suggestions: formattedSuggestions,
+            hasMore,
+            nextCursor
+        }, "Follow suggestions fetched successfully")
+    );
+});
+
+// const getFollowersByIntention = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+//     const userIdParam = req.params.id
+//     const intention = req.params.intention
+//     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50)
+//     const cursor = req.query.cursor as string | undefined
+
+//     if (!userIdParam) throw new ApiError(400, "User id is required")
+//     const userId
+
+// })
 
 export {
     followUnfollowUser,
     getFollowers,
     getFollowing,
+    removeFollower,
+    getFollowSuggestions,
 }

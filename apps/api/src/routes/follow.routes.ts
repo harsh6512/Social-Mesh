@@ -4,11 +4,16 @@ import {
     followUnfollowUser,
     getFollowers,
     getFollowing,
+    removeFollower,
+    getFollowSuggestions,
 } from '../controllers/follow.controller.js'
 
 const router=Router()
+router.route('/:id/follow').post(verifyJWT, followUnfollowUser)
+router.route('/:id/followers').get(verifyJWT, getFollowers);
+router.route('/:id/following').get(verifyJWT, getFollowing);
+router.route('/followers/:id').delete(verifyJWT, removeFollower);
+router.route('/suggestions').get(verifyJWT, getFollowSuggestions);
+router.route('/:id/followers/:intention').get(verifyJWT, getFollowers);
 
-router.route('/follow/:id/').post(verifyJWT,followUnfollowUser);
-router.route('/followers/:id').get(verifyJWT, getFollowers);
-router.route('/following/:id').get(verifyJWT,getFollowing)
 export default router

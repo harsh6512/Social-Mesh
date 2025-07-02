@@ -499,21 +499,21 @@ const getFollowingByIntention = asyncHandler(async (req: AuthenticatedRequest, r
 
 const followStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const accountIdParam = req.params.id;
-    const userId = req.user.id; 
+    const userId = req.user.id;
 
     if (!accountIdParam) throw new ApiError(400, "Account id is required");
 
     const accountId = parseInt(accountIdParam);
     if (isNaN(accountId)) throw new ApiError(400, "Invalid account id");
 
-    
+
     const followRecord = await prisma.follow.findFirst({
         where: {
             follower: {
-                userId 
+                userId
             },
             following: {
-                userId: accountId 
+                userId: accountId
             },
         },
         select: {
@@ -521,17 +521,14 @@ const followStatus = asyncHandler(async (req: AuthenticatedRequest, res: Respons
         }
     });
 
- 
-    if (!followRecord) {
-        return res
-            .status(200)
-            .json(new ApiResponse(200, { isFollowing: false }, "User is not following this account"));
-    }
+
+    const isFollowing = !!followRecord;
 
     return res
         .status(200)
-        .json(new ApiResponse(200, { isFollowing: true }, "User is following this account"));
+        .json(new ApiResponse(200, { isFollowing }, isFollowing ? "User is following" : "User is not following"));
 });
+
 export {
     followUnfollowUser,
     getFollowers,

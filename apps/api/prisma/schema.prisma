@@ -22,7 +22,7 @@ model User {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  profile      Profile?
+  profile Profile?
 }
 
 model Profile {
@@ -44,16 +44,47 @@ model Profile {
 }
 
 model Post {
-  id        Int        @id @default(autoincrement())
-  type      PostType
-  mediaUrl  String?
-  caption   String?    @db.Text
+  id          Int      @id @default(autoincrement())
+  type        PostType
+  caption     String?  @db.Text
+  isPublished Boolean  @default(true)
+
+  imagePost ImagePost?
+  videoPost VideoPost?
+  tweetPost TweetPost?
+
   comments  Comment[]
   authorId  Int
   author    Profile    @relation(fields: [authorId], references: [id], onDelete: Cascade)
   postLikes PostLike[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+}
+
+model ImagePost {
+  id       Int    @id @default(autoincrement())
+  imageUrl String
+
+  postId Int  @unique
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model VideoPost {
+  id           Int    @id @default(autoincrement())
+  videoUrl     String
+  thumbnailUrl String
+  duration     Int
+
+  postId Int  @unique
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model TweetPost {
+  id       Int     @id @default(autoincrement())
+  mediaUrl String?
+
+  postId Int  @unique
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
 
 model Comment {

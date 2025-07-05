@@ -46,7 +46,7 @@ model Profile {
 model Post {
   id          Int      @id @default(autoincrement())
   type        PostType
-  caption     String?  @db.Text
+  caption     String?   @db.VarChar(500)
   isPublished Boolean  @default(true)
 
   imagePost ImagePost?
@@ -72,7 +72,7 @@ model ImagePost {
 model VideoPost {
   id           Int    @id @default(autoincrement())
   videoUrl     String
-  thumbnailUrl String
+  thumbnailUrl String?
   duration     Int
 
   postId Int  @unique

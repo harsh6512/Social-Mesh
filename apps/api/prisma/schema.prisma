@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int          @id @default(autoincrement())
+  fullName     String       @db.VarChar(100)
+  username     String       @unique @db.VarChar(30)
+  email        String       @unique @db.VarChar(255)
+  gender       GenderType?
+  dateOfBirth  DateTime?
+  password     String?
+  google_id    String?      @unique
+  refreshToken String?
+  provider     ProviderType
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  profile Profile?
+}
+
+model Profile {
+  id         Int      @id @default(autoincrement())
+  bio        String?  @db.VarChar(300)
+  profilePic String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @unique
+
+  followers     Follow[]      @relation("UserFollowers")
+  following     Follow[]      @relation("UserFollowing")
+  comments      Comment[]
+  posts         Post[]
+  likedComments CommentLike[]
+  likedPosts    PostLike[]
+}
+
+model Post {
+  id          Int      @id @default(autoincrement())
+  type        PostType
+  caption     String?   @db.VarChar(500)
+  isPublished Boolean  @default(true)
+
+  imagePost ImagePost?
+  videoPost VideoPost?
+  tweetPost TweetPost?
+
+  comments  Comment[]
+  authorId  Int
+  author    Profile    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  postLikes PostLike[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model ImagePost {
+  id       Int    @id @default(autoincrement())
+  imageUrl String
+
+  postId Int  @unique
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model VideoPost {
+  id           Int    @id @default(autoincrement())
+  videoUrl     String
+  thumbnailUrl String?
+  duration     Int
+
+  postId Int  @unique
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model TweetPost {
+  id       Int     @id @default(autoincrement())
+  mediaUrl String?
+
+  postId Int  @unique
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id           Int           @id @default(autoincrement())
+  content      String        @db.Text
+  authorId     Int
+  author       Profile       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  postId       Int
+  post         Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentLikes CommentLike[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model CommentLike {
+  id        Int      @id @default(autoincrement())
+  authorId  Int
+  author    Profile  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  commentId Int
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([authorId, commentId])
+}
+
+model PostLike {
+  id        Int      @id @default(autoincrement())
+  authorId  Int
+  author    Profile  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([authorId, postId])
+}
+
+model Follow {
+  id          Int           @id @default(autoincrement())
+  followerId  Int
+  followingId Int
+  intention   IntentionType
+  createdAt   DateTime      @default(now())
+
+  follower  Profile @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following Profile @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+}
+
+enum ProviderType {
+  Credentials
+  Google
+}
+
+enum GenderType {
+  Male
+  Female
+  Other
+}
+
+enum IntentionType {
+  Friendship
+  Dating
+  Networking
+  Open
+  Omegle
+  Unspecified
+}
+
+enum PostType {
+  Image
+  Video
+  Tweet
+}

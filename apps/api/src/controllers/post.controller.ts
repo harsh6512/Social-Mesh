@@ -9,19 +9,6 @@ import { PostSchemas } from '@repo/common/schemas';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import { PostType } from '../generated/prisma/index.js';
 
-const isUserOwner = async (postId: number, profileId: number): Promise<boolean> => {
-    const post = await prisma.post.findUnique({
-        where: {
-            id: postId,
-        },
-        select: {
-            authorId: true,
-        }
-    });
-
-    return post?.authorId === profileId;
-};
-
 const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postType = req.params.postType
     const { caption } = req.body
@@ -48,9 +35,9 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                 caption
             }
 
-            const validationResult=PostSchemas.createPostSchema.safeParse(userInput)
+            const validationResult = PostSchemas.createPostSchema.safeParse(userInput)
             if (!validationResult.success) validationErrors(validationResult)
-       
+
             const uploaded = await uploadMedia(mediaUrl!)
 
             const post = await prisma.post.create({
@@ -93,9 +80,9 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                 caption
             }
 
-            const validationResult= PostSchemas.createPostSchema.safeParse(userInput)
+            const validationResult = PostSchemas.createPostSchema.safeParse(userInput)
             if (!validationResult.success) validationErrors(validationResult)
-            
+
             const videoUploaded = await uploadMedia(mediaUrl!)
 
             let thumbnailUploaded = null
@@ -108,7 +95,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                     type: postType,
                     caption,
                     isPublished: true,
-                    authorId:req.user.profile.id,
+                    authorId: req.user.profile.id,
                     videoPost: {
                         create: {
                             videoUrl: videoUploaded.url,
@@ -143,8 +130,8 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                 caption,
                 mediaUrl
             }
-            const validationResult=PostSchemas.createPostSchema.safeParse(userInput)
-
+            const validationResult = PostSchemas.createPostSchema.safeParse(userInput)
+            if (!validationResult.success) validationErrors(validationResult)
             let uploadedMediaUrl = null
             if (mediaUrl) {
                 const uploaded = await uploadMedia(mediaUrl)
@@ -169,13 +156,13 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                     isPublished: true,
                     createdAt: true,
                     updatedAt: true,
-                    author:{
-                        select:{
-                            user:{
-                                select:{
-                                    id:true,
-                                    username:true,
-                                    fullName:true,
+                    author: {
+                        select: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    fullName: true,
                                 }
                             }
                         }
@@ -275,18 +262,18 @@ const updatePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
             caption: true,
             isPublished: true,
             createdAt: true,
-                    updatedAt: true,
-                    author:{
-                        select:{
-                            user:{
-                                select:{
-                                    id:true,
-                                    username:true,
-                                    fullName:true,
-                                }
-                            }
+            updatedAt: true,
+            author: {
+                select: {
+                    user: {
+                        select: {
+                            id: true,
+                            username: true,
+                            fullName: true,
                         }
-                    },
+                    }
+                }
+            },
             ...includeMedia
         }
     })
@@ -296,8 +283,152 @@ const updatePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
         .json(new ApiResponse(200, updatedPost, "Post updated successfully"))
 })
 
+const togglePublishStatus = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const postIdParam = req.params.postId;
+    const userProfileId = req.user.profile.id;
+
+    if (!postIdParam) throw new ApiError(400, "Post id is required");
+
+    const postId = parseInt(postIdParam);
+    if (isNaN(postId)) throw new ApiError(400, "Invalid post Id");
+
+    const post = await prisma.post.findFirst({
+        where: { id: postId },
+        select: { authorId: true, isPublished: true }
+    });
+
+    if (!post) throw new ApiError(404, "Post not found");
+
+    if (post.authorId !== userProfileId) throw new ApiError(403, "Unauthorized Request");
+
+    const updatedPost = await prisma.post.updateMany({
+        where: { id: postId },
+        data: { isPublished: !post.isPublished }
+    });
+
+    if (updatedPost.count === 0) {
+        throw new ApiError(500, "Error while updating published status");
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, {}, "Published status updated")
+    );
+});
+
+const getPostById = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const postIdParam = req.params.postId
+    if (!postIdParam) throw new ApiError(400, "Post id is required")
+
+    const postId = parseInt(postIdParam)
+    if (isNaN(postId)) throw new ApiError(400, "Invalid post id")
+
+    const postType = await prisma.post.findUnique({
+        where: {
+            id: postId,
+        },
+        select: {
+            type: true,
+        }
+    })
+    const mediaIncludes = {
+        Image: { imagePost: { select: { id: true, imageUrl: true } } },
+        Video: { videoPost: { select: { id: true, videoUrl: true, thumbnailUrl: true } } },
+        Tweet: { tweetPost: { select: { id: true, mediaurl: true } } },
+    }
+
+    const type = postType.type as PostType
+    const includeMedia = mediaIncludes[type] || {}
+
+    const post = await prisma.post.findFirst({
+        where: {
+            id: postId,
+        },
+        select: {
+            id: true,
+            type: true,
+            isPublished: true,
+            caption: true,
+            author: {
+                select: {
+                    profilePic: true,
+                    user: {
+                        select: {
+                            username: true,
+                        }
+                    }
+                }
+            },
+            _count: {
+                select: {
+                    comments: true,
+                    postLikes: true,
+                }
+            },
+            ...includeMedia
+        }
+    })
+    if (!post || !post.isPublished) throw new ApiError(404, "Post not found")
+
+    type PostResult = {
+        id: number;
+        type: "Image" | "Video" | "Tweet";
+        isPublished: boolean;
+        caption?: string | null;
+        author: {
+            profilePic: string | null;
+            user: {
+                username: string;
+            };
+        };
+        _count: {
+            comments: number;
+            postLikes: number;
+        };
+        imagePost?: {
+            id: number;
+            imageUrl: string;
+        };
+        videoPost?: {
+            id: number;
+            videoUrl: string;
+            thumbnailUrl: string | null;
+        };
+        tweetPost?: {
+            id: number;
+            mediaurl: string;
+        };
+    };
+
+    const formattedPost = (post: PostResult) => ({
+        id: post.id,
+        type: post.type,
+        caption: post.caption,
+        isPublished: post.isPublished,
+        author: {
+            username: post.author.user.username,
+            profilePic: post.author.profilePic,
+        },
+        totalComments: post._count.comments,
+        totalLikes: post._count.postLikes,
+        media:
+            post.type === "Image"
+                ? post.imagePost
+                : post.type === "Video"
+                    ? post.videoPost
+                    : post.type === "Tweet"
+                        ? post.tweetPost
+                        : null,
+    });
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, formattedPost(post), "Post fetched successfully"))
+})
+
 export {
     createPost,
     deletePost,
     updatePost,
+    togglePublishStatus,
+    getPostById,
 }

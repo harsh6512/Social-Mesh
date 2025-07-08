@@ -47,17 +47,10 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                 imageUrl: mediaUrl,
                 caption
             }
-            const [userProfile, validationResult] = await Promise.all([
-                prisma.profile.findUnique({
-                    where: { id: req.user.id },
-                    select: { id: true }
-                }),
-                PostSchemas.createPostSchema.safeParse(userInput)
-            ])
 
+            const validationResult=PostSchemas.createPostSchema.safeParse(userInput)
             if (!validationResult.success) validationErrors(validationResult)
-            if (!userProfile) throw new ApiError(404, "Profile doesn't exist")
-
+       
             const uploaded = await uploadMedia(mediaUrl!)
 
             const post = await prisma.post.create({
@@ -65,7 +58,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                     type: postType,
                     caption,
                     isPublished: true,
-                    authorId: userProfile.id,
+                    authorId: req.user.profile.id,
                     imagePost: {
                         create: {
                             imageUrl: uploaded.url,
@@ -99,17 +92,10 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                 thumbnailUrl,
                 caption
             }
-            const [userProfile, validationResult] = await Promise.all([
-                prisma.profile.findUnique({
-                    where: { id: req.user.id },
-                    select: { id: true }
-                }),
-                PostSchemas.createPostSchema.safeParse(userInput)
-            ])
 
+            const validationResult= PostSchemas.createPostSchema.safeParse(userInput)
             if (!validationResult.success) validationErrors(validationResult)
-            if (!userProfile) throw new ApiError(404, "Profile doesn't exist")
-
+            
             const videoUploaded = await uploadMedia(mediaUrl!)
 
             let thumbnailUploaded = null
@@ -122,7 +108,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                     type: postType,
                     caption,
                     isPublished: true,
-                    authorId: userProfile.id,
+                    authorId:req.user.profile.id,
                     videoPost: {
                         create: {
                             videoUrl: videoUploaded.url,
@@ -157,16 +143,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                 caption,
                 mediaUrl
             }
-            const [userProfile, validationResult] = await Promise.all([
-                prisma.profile.findUnique({
-                    where: { id: req.user.id },
-                    select: { id: true }
-                }),
-                PostSchemas.createPostSchema.safeParse(userInput)
-            ])
-
-            if (!validationResult.success) validationErrors(validationResult)
-            if (!userProfile) throw new ApiError(404, "Profile doesn't exist")
+            const validationResult=PostSchemas.createPostSchema.safeParse(userInput)
 
             let uploadedMediaUrl = null
             if (mediaUrl) {
@@ -179,7 +156,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                     type: postType,
                     caption,
                     isPublished: true,
-                    authorId: userProfile.id,
+                    authorId: req.user.profile.id,
                     tweetPost: {
                         create: {
                             mediaUrl: uploadedMediaUrl,
@@ -241,7 +218,7 @@ const deletePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
 
     if (!post) throw new ApiError(404, "Post not found")
 
-    if (post.authorId !== req.user?.id) throw new ApiError(403, "Unauthorized Request")
+    if (post.authorId !== req.user?.profile.id) throw new ApiError(403, "Unauthorized Request")
 
     await prisma.post.delete({ where: { id: postId } });
 
@@ -276,7 +253,7 @@ const updatePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
 
     if (!validationResult.success) validationErrors(validationResult)
 
-    if (post.authorId != req.user?.id) throw new ApiError(403, "Unauthorized Request")
+    if (post.authorId != req.user.profile.id) throw new ApiError(403, "Unauthorized Request")
 
     const mediaIncludes = {
         Image: { imagePost: { select: { id: true, imageUrl: true } } },

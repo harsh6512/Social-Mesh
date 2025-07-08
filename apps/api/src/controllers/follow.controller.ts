@@ -6,7 +6,6 @@ import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
 import { prisma } from "../db/index.js"
 import { followSchemas } from "@repo/common/schemas";
 import { validationErrors } from "../utils/validationErrors.js";
-import { parse } from "path";
 
 const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const followerId = req.user?.id;
@@ -19,27 +18,19 @@ const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: R
         throw new ApiError(400, "Invalid following ID");
     }
 
-    if (!followingId) throw new ApiError(400, "The following ID is required");
     if (followerId === followingId) throw new ApiError(400, "You cannot follow yourself");
 
-    const [followerProfile, followingProfile] = await Promise.all([
-        prisma.profile.findUnique({
-            where: { userId: followerId },
-            select: { id: true }
-        }),
-        prisma.profile.findUnique({
-            where: { userId: followingId },
-            select: { id: true }
-        })
-    ]);
+    const followingProfile = await prisma.profile.findUnique({
+        where: { userId: followingId },
+        select: { id: true }
+    })
 
-    if (!followerProfile?.id || !followingProfile?.id) {
-        throw new ApiError(404, "Follower or Following profile not found");
+    if (!followingProfile?.id) {
+        throw new ApiError(404, "Following profile not found");
     }
 
-    const followerProfileId = followerProfile.id;
-    const followingProfileId = followingProfile.id;
-
+    const followerProfileId = req.user.profile.id;
+    const followingProfileId = followingProfile.id; 
     const existingFollow = await prisma.follow.findUnique({
         where: {
             followerId_followingId: {
@@ -70,7 +61,7 @@ const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: R
     if (!validationResult.success) {
         validationErrors(validationResult);
     }
-
+     
     await prisma.follow.create({
         data: {
             followerId: followerProfileId,
@@ -168,7 +159,7 @@ const getFollowing = asyncHandler(async (req: AuthenticatedRequest, res: Respons
 
     if (isNaN(userId)) throw new ApiError(400, "Invalid user IDs")
     const userProfile = await prisma.profile.findUnique({
-        where: {userId} ,
+        where: { userId },
         select: { id: true },
     });
 
@@ -232,32 +223,24 @@ const getFollowing = asyncHandler(async (req: AuthenticatedRequest, res: Respons
 
 const removeFollower = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user.id;
-    const followerIdParams = req.params.id;
+    const followerIdParams = req.params.id;//The id of the user of who is following the current user
 
     if (!followerIdParams) throw new ApiError(400, "Follower id is required");
 
     const followerId = parseInt(followerIdParams);
     if (isNaN(followerId)) throw new ApiError(400, "Invalid follower id");
 
-    const [followerProfile, userProfile] = await Promise.all([
-        prisma.profile.findUnique({
+    const followerProfile =await prisma.profile.findUnique({
             where: { userId: followerId },
             select: { id: true }
-        }),
-        prisma.profile.findUnique({
-            where: { userId: userId },
-            select: { id: true }
         })
-    ]);
 
-    if (!followerProfile || !userProfile) {
-        throw new ApiError(404, "Follower or user profile doesn't exist");
-    }
+    if (!followerProfile) throw new ApiError(404, "Follower profile doesn't exist");
 
     const result = await prisma.follow.deleteMany({
         where: {
             followerId: followerProfile.id,
-            followingId: userProfile.id,
+            followingId: req.user.profile.id,
         }
     });
 
@@ -272,19 +255,12 @@ const removeFollower = asyncHandler(async (req: AuthenticatedRequest, res: Respo
 
 const getFollowSuggestions = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user.id;
+    const userProfileID =req.user.profile.id
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
     const cursorParam = req.query.cursor as string | undefined;
     const cursor = cursorParam ? parseInt(cursorParam) : undefined;
 
     if (cursorParam && isNaN(cursor!)) throw new ApiError(400, "Invalid cursor");
-
-
-    const userProfile = await prisma.profile.findUnique({
-        where: { userId },
-        select: { id: true }
-    });
-
-    if (!userProfile) throw new ApiError(404, "User profile not found");
 
     const suggestions = await prisma.profile.findMany({
         take: limit + 1,
@@ -296,7 +272,7 @@ const getFollowSuggestions = asyncHandler(async (req: AuthenticatedRequest, res:
             NOT: {
                 followers: {
                     some: {
-                        followerId: userProfile.id
+                        followerId: userProfileID
                     }
                 }
             }
@@ -365,9 +341,7 @@ const getFollowersByIntention = asyncHandler(async (req: AuthenticatedRequest, r
 
     const followers = await prisma.follow.findMany({
         where: {
-            following: {
-                userId,
-            },
+            followingId:req.user.profile.id, 
             intention: intention
         },
         take: limit + 1,
@@ -441,9 +415,7 @@ const getFollowingByIntention = asyncHandler(async (req: AuthenticatedRequest, r
 
     const following = await prisma.follow.findMany({
         where: {
-            follower: {
-                userId,
-            },
+            followerId: req.user.profile.id,
             intention: intention
         },
         take: limit + 1,

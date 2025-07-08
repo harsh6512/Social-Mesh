@@ -19,6 +19,7 @@ import profileRouter from './routes/profile.routes.js';
 import authRouter from './routes/auth.routes.js';
 import followRouter from './routes/follow.routes.js';
 import postRouter from './routes/post.routes.js';
+import { ProfileSchemas } from '@repo/common/schemas';
 
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/users', userRouter)

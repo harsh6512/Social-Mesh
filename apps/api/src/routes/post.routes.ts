@@ -16,7 +16,6 @@ router.route('/:postType').post(verifyJWT,
     ]),
     createPost)
 router.route('/:postId').delete(verifyJWT,deletePost)
-router.route('/:postId').patch(verifyJWT, updatePost);
-
+router.route('/:postId').patch(verifyJWT, updatePost)
 
 export default router

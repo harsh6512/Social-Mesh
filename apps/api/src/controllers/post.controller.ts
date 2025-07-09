@@ -8,6 +8,8 @@ import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 import { PostSchemas } from '@repo/common/schemas';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
 import { PostType } from '../generated/prisma/index.js';
+import { redis } from "../lib/redis.js";
+import { PostResult } from '../types/post.types.js';
 
 const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postType = req.params.postType
@@ -395,7 +397,7 @@ const getPostById = asyncHandler(async (req: AuthenticatedRequest, res: Response
         };
         tweetPost?: {
             id: number;
-            mediaurl: string;
+            mediaUrl: string;
         };
     };
 
@@ -425,10 +427,228 @@ const getPostById = asyncHandler(async (req: AuthenticatedRequest, res: Response
         .json(new ApiResponse(200, formattedPost(post), "Post fetched successfully"))
 })
 
+const getDraftPosts = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userProfileId = req.user.profile.id
+
+    const posts = await prisma.post.findMany({
+        where: {
+            authorId: userProfileId,
+            isPublished: false
+        },
+        select: {
+            id: true,
+            type: true,
+            caption: true,
+            imagePost: {
+                select: {
+                    imageUrl: true
+                }
+            },
+            videoPost: {
+                select: {
+                    videoUrl: true,
+                    thumbnailUrl: true,
+                    duration: true
+                }
+            },
+            tweetPost: {
+                select: {
+                    mediaUrl: true
+                }
+            }
+        }
+    });
+
+    if (posts.length == 0) {
+        return res
+            .status(200)
+            .json(new ApiResponse(200, {}, "No posts in draft"))
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, posts, "User drafts fetched succesfully"))
+})
+
+const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userProfileId = req.user.profile.id;
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const cursorParam = req.query.cursor as string | undefined;
+
+    const cursor = cursorParam ? parseInt(cursorParam) : undefined;
+    if (cursorParam && isNaN(cursor!)) throw new ApiError(400, "Invalid cursor Id");
+
+    const redisKey = `user:${userProfileId}:followingFeedDone`;
+    let followingFeedDone = await redis.get(redisKey);
+    let posts: PostResult[] = [];
+
+    // First phase: Get posts from people user follows
+    if (followingFeedDone !== "true") {
+        posts = await prisma.post.findMany({
+            take: limit + 1,
+            skip: cursor ? 1 : 0,
+            cursor: cursor ? { id: cursor } : undefined,
+            orderBy: { createdAt: "desc" },
+            where: {
+                isPublished: true,
+                author: {
+                    followers: {
+                        some: {
+                            followerId: userProfileId
+                        }
+                    }
+                }
+            },
+            select: {
+                id: true,
+                type: true,
+                isPublished: true,
+                caption: true,
+                createdAt: true,
+                author: {
+                    select: {
+                        profilePic: true,
+                        user: {
+                            select: { username: true }
+                        }
+                    }
+                },
+                _count: {
+                    select: {
+                        comments: true,
+                        postLikes: true
+                    }
+                },
+                imagePost: {
+                    select: {
+                        id: true,
+                        imageUrl: true
+                    }
+                },
+                videoPost: {
+                    select: {
+                        id: true,
+                        videoUrl: true,
+                        thumbnailUrl: true
+                    }
+                },
+                tweetPost: {
+                    select: {
+                        id: true,
+                        mediaUrl: true
+                    }
+                }
+            }
+        });
+
+       //If all the following posts is fetched mark as done
+        if (posts.length <= limit) {
+           await redis.set(redisKey, 'true', 'EX', 3600); // expires in 1 hour
+        }
+    }
+
+    //If the following posts are fetched then fetch more post
+    if (followingFeedDone === "true" || posts.length === 0) {
+        posts = await prisma.post.findMany({
+            take: limit + 1,
+            skip: cursor ? 1 : 0,
+            cursor: cursor ? { id: cursor } : undefined,
+            orderBy: { createdAt: "desc" },
+            where: {
+                isPublished: true,
+                author: {
+                    followers: {
+                        none: {
+                            followerId: userProfileId
+                        }
+                    }
+                }
+                // Removed authorId exclusion - user might want to see their own posts
+                // If you want to exclude user's own posts, uncomment:
+                // authorId: { not: userProfileId }
+            },
+            select: {
+                id: true,
+                type: true,
+                isPublished: true,
+                caption: true,
+                createdAt: true,
+                author: {
+                    select: {
+                        profilePic: true,
+                        user: {
+                            select: { username: true }
+                        }
+                    }
+                },
+                _count: {
+                    select: {
+                        comments: true,
+                        postLikes: true
+                    }
+                },
+                imagePost: {
+                    select: {
+                        id: true,
+                        imageUrl: true
+                    }
+                },
+                videoPost: {
+                    select: {
+                        id: true,
+                        videoUrl: true,
+                        thumbnailUrl: true
+                    }
+                },
+                tweetPost: {
+                    select: {
+                        id: true,
+                        mediaUrl: true
+                    }
+                }
+            }
+        });
+    }
+    const hasNextPage = posts.length > limit;
+    const trimmedPosts = hasNextPage ? posts.slice(0, limit) : posts;
+    const nextCursor = hasNextPage ? trimmedPosts[trimmedPosts.length - 1]?.id : null;
+
+    const formattedPost = (post: PostResult) => ({
+        id: post.id,
+        type: post.type,
+        caption: post.caption,
+        isPublished: post.isPublished,
+        author: {
+            username: post.author.user.username,
+            profilePic: post.author.profilePic,
+        },
+        totalComments: post._count.comments,
+        totalLikes: post._count.postLikes,
+        media:
+            post.type === "Image"
+                ? post.imagePost
+                : post.type === "Video"
+                    ? post.videoPost
+                    : post.type === "Tweet"
+                        ? post.tweetPost
+                        : null,
+    });
+
+    return res.status(200).json(
+        new ApiResponse(200, {
+            posts:trimmedPosts.map(formattedPost), 
+            hasNextPage,
+            nextCursor,
+        }, "Home posts fetched successfully")
+    );
+});
+
 export {
     createPost,
     deletePost,
     updatePost,
     togglePublishStatus,
     getPostById,
+    getDraftPosts,
+    getHomePosts,
 }

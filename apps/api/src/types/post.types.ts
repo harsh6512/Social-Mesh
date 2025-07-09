@@ -1,3 +1,4 @@
+// PostResult defines the shape of post data returned to the client,
 export type PostResult = {
   id: number;
   type: "Image" | "Video" | "Tweet";

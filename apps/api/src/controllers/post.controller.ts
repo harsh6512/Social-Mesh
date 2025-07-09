@@ -482,7 +482,7 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
     let followingFeedDone = await redis.get(redisKey);
     let posts: PostResult[] = [];
 
-    // First phase: Get posts from people user follows
+    // Get posts from people user follows
     if (followingFeedDone !== "true") {
         posts = await prisma.post.findMany({
             take: limit + 1,
@@ -563,9 +563,6 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
                         }
                     }
                 }
-                // Removed authorId exclusion - user might want to see their own posts
-                // If you want to exclude user's own posts, uncomment:
-                // authorId: { not: userProfileId }
             },
             select: {
                 id: true,
@@ -643,6 +640,187 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
     );
 });
 
+//User can filter what type fo content they want to see
+const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userProfileId = req.user.profile.id;
+    const type = req.params.type;
+    
+    if (!type) throw new ApiError(400, "Post type is required");
+    const validationResult=PostSchemas.postTypeSchema.safeParse(type)
+
+    if(!validationResult.success) validationErrors(validationResult)
+        
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const cursorParam = req.query.cursor as string | undefined;
+
+    const cursor = cursorParam ? parseInt(cursorParam) : undefined;
+    if (cursorParam && isNaN(cursor!)) throw new ApiError(400, "Invalid cursor Id");
+
+
+    const redisKey = `user:${userProfileId}:followingFeedDone:${type}`;
+    let followingFeedDone = await redis.get(redisKey);
+    let posts: PostResult[] = [];
+
+    if (followingFeedDone !== "true") {
+        posts = await prisma.post.findMany({
+            take: limit + 1,
+            skip: cursor ? 1 : 0,
+            cursor: cursor ? { id: cursor } : undefined,
+            orderBy: { createdAt: "desc" },
+            where: {
+                isPublished: true,
+                type: type,
+                author: {
+                    followers: {
+                        some: {
+                            followerId: userProfileId
+                        }
+                    }
+                }
+            },
+            select: {
+                id: true,
+                type: true,
+                isPublished: true,
+                caption: true,
+                createdAt: true,
+                author: {
+                    select: {
+                        profilePic: true,
+                        user: {
+                            select: { username: true }
+                        }
+                    }
+                },
+                _count: {
+                    select: {
+                        comments: true,
+                        postLikes: true
+                    }
+                },
+                imagePost: {
+                    select: {
+                        id: true,
+                        imageUrl: true
+                    }
+                },
+                videoPost: {
+                    select: {
+                        id: true,
+                        videoUrl: true,
+                        thumbnailUrl: true
+                    }
+                },
+                tweetPost: {
+                    select: {
+                        id: true,
+                        mediaUrl: true
+                    }
+                }
+            }
+        });
+
+        // If all the following posts is fetched mark as done
+        if (posts.length <= limit) {
+            await redis.set(redisKey, 'true', 'EX', 3600) 
+        }
+    }
+
+    // If the following posts are fetched then fetch more post
+    if (followingFeedDone === "true" || posts.length === 0) {
+        posts = await prisma.post.findMany({
+            take: limit + 1,
+            skip: cursor ? 1 : 0,
+            cursor: cursor ? { id: cursor } : undefined,
+            orderBy: { createdAt: "desc" },
+            where: {
+                isPublished: true,
+                type: type,
+                author: {
+                    followers: {
+                        none: {
+                            followerId: userProfileId
+                        }
+                    }
+                }
+            },
+            select: {
+                id: true,
+                type: true,
+                isPublished: true,
+                caption: true,
+                createdAt: true,
+                author: {
+                    select: {
+                        profilePic: true,
+                        user: {
+                            select: { username: true }
+                        }
+                    }
+                },
+                _count: {
+                    select: {
+                        comments: true,
+                        postLikes: true
+                    }
+                },
+                imagePost: {
+                    select: {
+                        id: true,
+                        imageUrl: true
+                    }
+                },
+                videoPost: {
+                    select: {
+                        id: true,
+                        videoUrl: true,
+                        thumbnailUrl: true
+                    }
+                },
+                tweetPost: {
+                    select: {
+                        id: true,
+                        mediaUrl: true
+                    }
+                }
+            }
+        });
+    }
+    
+    const hasNextPage = posts.length > limit;
+    const trimmedPosts = hasNextPage ? posts.slice(0, limit) : posts;
+    const nextCursor = hasNextPage ? trimmedPosts[trimmedPosts.length - 1]?.id : null;
+
+    const formattedPost = (post: PostResult) => ({
+        id: post.id,
+        type: post.type,
+        caption: post.caption,
+        isPublished: post.isPublished,
+        author: {
+            username: post.author.user.username,
+            profilePic: post.author.profilePic,
+        },
+        totalComments: post._count.comments,
+        totalLikes: post._count.postLikes,
+        media:
+            post.type === "Image"
+                ? post.imagePost
+                : post.type === "Video"
+                    ? post.videoPost
+                    : post.type === "Tweet"
+                        ? post.tweetPost
+                        : null,
+    });
+
+    return res.status(200).json(
+        new ApiResponse(200, {
+            posts: trimmedPosts.map(formattedPost), 
+            hasNextPage,
+            nextCursor,
+        }, `${type} posts fetched successfully`)
+    );
+});
+
 export {
     createPost,
     deletePost,
@@ -651,4 +829,5 @@ export {
     getPostById,
     getDraftPosts,
     getHomePosts,
+    getHomePostsByType
 }

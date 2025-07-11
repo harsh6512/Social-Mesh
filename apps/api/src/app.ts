@@ -19,13 +19,14 @@ import profileRouter from './routes/profile.routes.js';
 import authRouter from './routes/auth.routes.js';
 import followRouter from './routes/follow.routes.js';
 import postRouter from './routes/post.routes.js';
-import { ProfileSchemas } from '@repo/common/schemas';
+import likeRouter from './routes/like.routes.js'
 
 app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/users', userRouter)
 app.use('/api/v1/profiles', profileRouter)
 app.use('/api/v1/connection',followRouter)
 app.use('/api/v1/posts',postRouter)
+app.use('/api/v1/likes',likeRouter)
 app.use(errorHandler)
 
 export { app };

@@ -2,7 +2,7 @@
 export type PostResult = {
   id: number;
   type: "Image" | "Video" | "Tweet";
-  isPublished: boolean;
+  isPublished?: boolean; //not every time isPublished will be selected in query
   caption?: string | null;
   author: {
     profilePic: string | null;

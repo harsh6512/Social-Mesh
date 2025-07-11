@@ -1,15 +1,21 @@
+import { Response } from 'express';
+
+import { PostSchemas } from '@repo/common/schemas';
+
+import { prisma } from '../db/index.js';
+import { redis } from '../lib/redis.js';
+
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { validationErrors } from '../utils/validationErrors.js';
-import { prisma } from '../db/index.js'
-import { Response } from 'express'
-import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
-import { PostSchemas } from '@repo/common/schemas';
 import { uploadOnCloudinary } from '../utils/cloudinary.js';
-import { PostType } from '../generated/prisma/index.js';
-import { redis } from "../lib/redis.js";
+
+import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 import { PostResult } from '../types/post.types.js';
+
+import { PostType } from '../generated/prisma/index.js';
+
 
 const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postType = req.params.postType
@@ -649,7 +655,7 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
     const validationResult=PostSchemas.postTypeSchema.safeParse(type)
 
     if(!validationResult.success) validationErrors(validationResult)
-        
+
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
     const cursorParam = req.query.cursor as string | undefined;
 

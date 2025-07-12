@@ -1,4 +1,4 @@
-// PostResult defines the shape of post data returned to the client,
+// PostResult defines the shape of post data returned  by the prisma,
 export type PostResult = {
   id: number;
   type: "Image" | "Video" | "Tweet";

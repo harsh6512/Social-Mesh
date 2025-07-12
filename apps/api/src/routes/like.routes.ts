@@ -3,7 +3,7 @@ import {
     likeUnlikePost,
     likeUnlikeComment,
     getPostLikes,
-    getUserLikedPosts
+    getUserLikedPosts,
  } from '../controllers/like.controller.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
 

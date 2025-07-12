@@ -89,7 +89,7 @@ model TweetPost {
 
 model Comment {
   id           Int           @id @default(autoincrement())
-  content      String        @db.Text
+  content      String        @db.VarChar(500)
   authorId     Int
   author       Profile       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   postId       Int

@@ -12,7 +12,6 @@ import { validationErrors } from '../utils/validationErrors.js';
 import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 import { CommentResult } from '../types/comment.types.js';
 
-
 const postComment = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postIdParam = req.params.postId
     const { content } = req.body

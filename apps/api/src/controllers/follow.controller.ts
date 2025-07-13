@@ -1,11 +1,13 @@
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-import { Response } from 'express'
-import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
-import { prisma } from "../db/index.js"
-import { followSchemas } from "@repo/common/schemas";
-import { validationErrors } from "../utils/validationErrors.js";
+import { Response } from 'express';
+import { followSchemas } from '@repo/common/schemas';
+
+import { prisma } from '../db/index.js';
+import { ApiError } from '../utils/ApiError.js';
+import { ApiResponse } from '../utils/ApiResponse.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { validationErrors } from '../utils/validationErrors.js';
+
+import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 
 const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const followerId = req.user?.id;

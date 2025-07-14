@@ -1,12 +1,15 @@
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-import { Request, Response } from "express"
-import { prisma } from "../db/index.js"
-import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
-import { ProfileSchemas } from "@repo/common/schemas";
-import { validationErrors } from "../utils/validationErrors.js";
+import { Response } from 'express';
+import { ProfileSchemas } from '@repo/common/schemas';
+
+import { prisma } from '../db/index.js';
+import { ApiError } from '../utils/ApiError.js';
+import { ApiResponse } from '../utils/ApiResponse.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import { validationErrors } from '../utils/validationErrors.js';
+
+import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
+
 
 const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user?.id

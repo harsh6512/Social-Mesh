@@ -22,7 +22,8 @@ model User {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  profile Profile?
+  profile   Profile?
+  fcm_token Fcm_Token[]
 }
 
 model Profile {
@@ -46,7 +47,7 @@ model Profile {
 model Post {
   id          Int      @id @default(autoincrement())
   type        PostType
-  caption     String?   @db.VarChar(500)
+  caption     String?  @db.VarChar(500)
   isPublished Boolean  @default(true)
 
   imagePost ImagePost?
@@ -70,7 +71,7 @@ model ImagePost {
 }
 
 model VideoPost {
-  id           Int    @id @default(autoincrement())
+  id           Int     @id @default(autoincrement())
   videoUrl     String
   thumbnailUrl String?
   duration     Int
@@ -134,6 +135,17 @@ model Follow {
   @@unique([followerId, followingId])
 }
 
+model Fcm_Token {
+  id        Int      @id @default(autoincrement())
+  token     String   @db.VarChar(255)
+  deviceId  String   @unique @db.VarChar(50)
+  isActive  Boolean  @default(true)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, deviceId])
+}
 enum ProviderType {
   Credentials
   Google

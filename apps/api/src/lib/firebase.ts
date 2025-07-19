@@ -1,4 +1,5 @@
 import admin from 'firebase-admin';
+import type { Messaging } from 'firebase-admin/messaging';
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -10,4 +11,6 @@ if (!admin.apps.length) {
   });
 }
 
-export { admin };
+const messaging: Messaging = admin.messaging();
+
+export { admin, messaging };

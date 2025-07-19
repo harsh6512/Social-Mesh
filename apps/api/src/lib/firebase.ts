@@ -1,16 +1,14 @@
 import admin from 'firebase-admin';
 import type { Messaging } from 'firebase-admin/messaging';
+import { ENV } from "../constants/env.js";
 
 if (!admin.apps.length) {
+  const firebaseAdminConfig = JSON.parse(ENV.FIREBASE_ADMIN_API!);
+  
   admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
+    credential: admin.credential.cert(firebaseAdminConfig),
   });
 }
 
 const messaging: Messaging = admin.messaging();
-
 export { admin, messaging };

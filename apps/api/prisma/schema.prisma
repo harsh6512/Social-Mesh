@@ -23,7 +23,7 @@ model User {
   updatedAt    DateTime     @updatedAt
 
   profile   Profile?
-  fcm_token Fcm_Token[]
+  fcm_token FcmToken[]
 }
 
 model Profile {
@@ -135,7 +135,7 @@ model Follow {
   @@unique([followerId, followingId])
 }
 
-model Fcm_Token {
+model FcmToken {
   id        Int      @id @default(autoincrement())
   token     String   @db.VarChar(255)
   deviceId  String   @unique @db.VarChar(50)
@@ -146,6 +146,7 @@ model Fcm_Token {
   
   @@unique([userId, deviceId])
 }
+
 enum ProviderType {
   Credentials
   Google

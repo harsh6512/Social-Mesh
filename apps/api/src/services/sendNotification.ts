@@ -1,39 +1,58 @@
-import { messaging } from "../lib/firebase.js";
+import { admin,messaging } from "../lib/firebase.js";
+import { prisma } from '../db/index.js'
 
 type NotificationPayload = {
-  title: string;
-  body: string;
+  type: "Follow" | "Like" | "Comment" | "Quick_Connect" | "Direct_Message";
+  message: string;
+  senderId: number;
+  recipientId: number;
   imageUrl?: string;
+  postId?: number
 };
 
 export async function sendNotification(
   tokens: string[],
   notification: NotificationPayload
 ) {
-  if (!tokens.length) return;
-
-  const message = {
-    notification: {
-      title: notification.title,
-      body: notification.body,
-      ...(notification.imageUrl && { imageUrl: notification.imageUrl }),
-    },
-    tokens,
-  };
-
   try {
-    const response = await messaging.sendEachForMulticast(message);
-    console.log("✅ Sent:", response.successCount, "successes");
+    const message = tokens.length>0
+      ? {
+        notification: {
+          title: notification.type,//sending type of notification as title
+          body: notification.message,
+          ...(notification.imageUrl && { imageUrl: notification.imageUrl }),
+        },
+        tokens
+      }
+      : null;
 
-    if (response.failureCount > 0) {
-      const failed = response.responses
-        .map((r, i) => (!r.success ? tokens[i] : null))
-        .filter(Boolean);
-      console.warn("⚠️ Failed tokens:", failed);
+    const [pushResult, dbResult] = await Promise.all([
+      message ? messaging.sendEachForMulticast(message) : Promise.resolve(null),
+      prisma.notification.create({
+        data: {
+          type: notification.type,
+          senderId: notification.senderId,
+          recipientId: notification.recipientId,
+          postId: notification.postId,
+          message: notification.message,
+        },
+      })
+    ]);
+
+    if (pushResult) {
+      console.log("✅ Push Sent:", pushResult.successCount, "successes");
+
+      if (pushResult.failureCount > 0) {
+        const failed = pushResult.responses
+          .map((r: admin.messaging.SendResponse, i: number) => (!r.success ? tokens[i] : null))
+          .filter(Boolean);
+        console.warn("⚠️ Failed tokens:", failed);
+      }
     }
-    return response;
+
+    return {pushResult, dbResult}
   } catch (err) {
-    console.error("❌ Error sending FCM:", err);
+    console.error("❌ Error in sending or saving notification:", err);
     throw err;
   }
 }

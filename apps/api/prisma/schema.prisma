@@ -152,13 +152,12 @@ model FcmToken {
 model Notification {
   id          Int              @id @default(autoincrement())
   type        NotificationType
-  senderId    Int?
+  senderId    Int
   sender      User?            @relation("SentNotifications", fields: [senderId], references: [id])
   recipientId Int
   recipient   User             @relation("ReceivedNotifications", fields: [recipientId], references: [id])
   postId      Int?
   message     String
-  actionUrl   String?
   isRead      Boolean          @default(false)
   createdAt   DateTime         @default(now())
 }
@@ -167,7 +166,7 @@ enum NotificationType {
   Follow
   Like
   Comment
-  Omegle
+  Quick_Connect
   Direct_Message
 }
 
@@ -187,7 +186,7 @@ enum IntentionType {
   Dating
   Networking
   Open
-  Omegle
+  Quick_Connect
   Unspecified
 }
 

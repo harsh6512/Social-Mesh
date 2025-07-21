@@ -6,6 +6,6 @@ import { verifyJWT } from '../middlewares/auth.middleware.js';
 
 const router = Router()
 
-router.route('/fcm-token').post(registerFcmToken);
+router.route('/fcm-token').post(verifyJWT,registerFcmToken);
 
 export default router

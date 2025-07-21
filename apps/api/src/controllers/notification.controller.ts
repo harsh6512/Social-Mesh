@@ -28,7 +28,8 @@ const registerFcmToken = asyncHandler(async (req: AuthenticatedRequest, res: Res
     if (existingToken) {
         await prisma.fcmToken.updateMany({
             where: {
-                token: token
+                token: token,
+                userId:req.user.id,
             },
             data: {
                 isActive: true,
@@ -46,7 +47,7 @@ const registerFcmToken = asyncHandler(async (req: AuthenticatedRequest, res: Res
         data: {
             token: token,
             deviceId: deviceId,
-            userId: 1,
+            userId:req.user.id,
         },
         select: {
             id: true,

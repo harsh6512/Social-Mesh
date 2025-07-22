@@ -9,6 +9,8 @@ import { validationErrors } from '../utils/validationErrors.js';
 
 import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 
+import { sendNotification } from '../services/sendNotification.js'
+
 const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const followerId = req.user?.id;
     const followingIdParam = req.params.id;
@@ -24,7 +26,10 @@ const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: R
 
     const followingProfile = await prisma.profile.findUnique({
         where: { userId: followingId },
-        select: { id: true }
+        select: {
+            id: true,
+            userId: true
+        }
     })
 
     if (!followingProfile?.id) {
@@ -32,7 +37,7 @@ const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: R
     }
 
     const followerProfileId = req.user.profile.id;
-    const followingProfileId = followingProfile.id; 
+    const followingProfileId = followingProfile.id;
     const existingFollow = await prisma.follow.findUnique({
         where: {
             followerId_followingId: {
@@ -63,7 +68,7 @@ const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: R
     if (!validationResult.success) {
         validationErrors(validationResult);
     }
-     
+
     await prisma.follow.create({
         data: {
             followerId: followerProfileId,
@@ -71,6 +76,26 @@ const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: R
             intention,
         }
     });
+
+    const tokens = await prisma.fcmToken.findMany({
+        where: {
+            userId: followingProfile.userId,
+        },
+        select: {
+            token: true,
+        }
+    })
+
+    const tokenStrings = tokens.map((t:  { token: string }) => t.token);
+    await sendNotification(
+        tokens,
+        {
+            type: "Follow",
+            message: `${req.user.username} started following you`,
+            senderId: req.user.id,
+            recipientId: followingProfile.userId,
+        }
+    )
 
     return res
         .status(200)
@@ -232,10 +257,10 @@ const removeFollower = asyncHandler(async (req: AuthenticatedRequest, res: Respo
     const followerId = parseInt(followerIdParams);
     if (isNaN(followerId)) throw new ApiError(400, "Invalid follower id");
 
-    const followerProfile =await prisma.profile.findUnique({
-            where: { userId: followerId },
-            select: { id: true }
-        })
+    const followerProfile = await prisma.profile.findUnique({
+        where: { userId: followerId },
+        select: { id: true }
+    })
 
     if (!followerProfile) throw new ApiError(404, "Follower profile doesn't exist");
 
@@ -257,7 +282,7 @@ const removeFollower = asyncHandler(async (req: AuthenticatedRequest, res: Respo
 
 const getFollowSuggestions = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user.id;
-    const userProfileID =req.user.profile.id
+    const userProfileID = req.user.profile.id
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
     const cursorParam = req.query.cursor as string | undefined;
     const cursor = cursorParam ? parseInt(cursorParam) : undefined;
@@ -343,7 +368,7 @@ const getFollowersByIntention = asyncHandler(async (req: AuthenticatedRequest, r
 
     const followers = await prisma.follow.findMany({
         where: {
-            followingId:req.user.profile.id, 
+            followingId: req.user.profile.id,
             intention: intention
         },
         take: limit + 1,

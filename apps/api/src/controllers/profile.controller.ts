@@ -10,7 +10,6 @@ import { validationErrors } from '../utils/validationErrors.js';
 
 import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 
-
 const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user?.id
 

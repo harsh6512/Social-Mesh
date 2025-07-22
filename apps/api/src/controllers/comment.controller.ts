@@ -12,6 +12,8 @@ import { validationErrors } from '../utils/validationErrors.js';
 import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 import { CommentResult } from '../types/comment.types.js';
 
+import { sendNotification } from '../services/sendNotification.js';
+
 const postComment = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postIdParam = req.params.postId
     const { content } = req.body
@@ -22,13 +24,18 @@ const postComment = asyncHandler(async (req: AuthenticatedRequest, res: Response
     if (isNaN(postId)) throw new ApiError(400, "Invalid post id")
 
     const [post, validationResult] = await Promise.all([
-        await prisma.post.findUnique({
+        prisma.post.findUnique({
             where: {
                 id: postId,
                 isPublished: true,
             },
             select: {
                 id: true,
+                author: {
+                    select: {
+                        userId: true
+                    }
+                }
             }
         }),
         CommentSchemas.commentSchema.safeParse({ content })
@@ -47,6 +54,31 @@ const postComment = asyncHandler(async (req: AuthenticatedRequest, res: Response
             id: true,
         }
     })
+
+    // Not sending  notification if commenting on own post
+    if (post.author.userId !== req.user.id) {
+        const tokens = await prisma.fcmToken.findMany({
+            where: {
+                userId: post.author.userId, //finding the token for the post author
+            },
+            select: {
+                token: true,
+            }
+        })
+
+        const tokenStrings = tokens.map((t:  { token: string }) => t.token)
+        
+        await sendNotification(
+            tokenStrings,
+            {
+                type: "Comment",
+                message: `${req.user.username} commented on your post`,
+                postId: postId,
+                senderId: req.user.id,
+                recipientId: post.author.userId,
+            }
+        )
+    }
 
     return res
         .status(201)

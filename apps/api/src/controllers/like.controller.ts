@@ -9,6 +9,8 @@ import { ApiError } from '../utils/ApiError.js';
 import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 import { PostResult } from '../types/post.types.js';
 
+import { sendNotification } from '../services/sendNotification.js';
+
 const likeUnlikePost = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postIdParam = req.params.postId
     if (!postIdParam) throw new ApiError(400, "Post id is required")
@@ -16,14 +18,21 @@ const likeUnlikePost = asyncHandler(async (req: AuthenticatedRequest, res: Respo
     const postId = parseInt(postIdParam)
     if (isNaN(postId)) throw new ApiError(400, "Invalid post id")
 
-    const postExists = await prisma.post.findFirst({
+    const post = await prisma.post.findUnique({
         where: {
             id: postId,
             isPublished: true,
         },
-        select: { id: true }
+        select: {
+            id: true,
+            author: {
+                select: {
+                    userId: true,
+                }
+            }
+        }
     })
-    if (!postExists) throw new ApiError(404, "Post not found")
+    if (!post) throw new ApiError(404, "Post not found")
 
     const isLiked = await prisma.postLike.findUnique({
         where: {
@@ -42,6 +51,30 @@ const likeUnlikePost = asyncHandler(async (req: AuthenticatedRequest, res: Respo
                 authorId: req.user.profile.id
             }
         })
+
+        if (post.author.userId !== req.user.id) {
+            const tokens = await prisma.fcmToken.findMany({
+                where: {
+                    userId: post.author.userId, //finding the token for the post author
+                },
+                select: {
+                    token: true,
+                }
+            })
+
+            const tokenStrings = tokens.map((t: { token: string }) => t.token)
+
+            await sendNotification(
+                tokenStrings,
+                {
+                    type: "Like",
+                    message: `${req.user.username} liked your post`,
+                    postId: postId,
+                    senderId: req.user.id,
+                    recipientId: post.author.userId,
+                }
+            )
+        }
 
         return res
             .status(200)
@@ -73,7 +106,16 @@ const likeUnlikeComment = asyncHandler(async (req: AuthenticatedRequest, res: Re
         where: {
             id: commentId,
         },
-        select: { id: true }
+        select: {
+            id: true,
+            postId:true,
+            author: {
+                select: {
+                    id: true,
+                    userId: true
+                }
+            }
+        }
     })
 
     if (!comment) throw new ApiError(404, "Comment not found")
@@ -95,6 +137,30 @@ const likeUnlikeComment = asyncHandler(async (req: AuthenticatedRequest, res: Re
                 commentId: commentId,
             }
         })
+
+         if (comment.author.userId !== req.user.id) {
+            const tokens = await prisma.fcmToken.findMany({
+                where: {
+                    userId: comment.author.userId, //finding the token for the author of the comment
+                },
+                select: {
+                    token: true,
+                }
+            })
+
+            const tokenStrings = tokens.map((t: { token: string }) => t.token)
+
+            await sendNotification(
+                tokenStrings,
+                {
+                    type: "Like",
+                    message: `${req.user.username} liked your comment`,
+                    postId: comment.postId,
+                    senderId: req.user.id,
+                    recipientId: comment.author.userId,
+                }
+            )
+        }
 
         return res
             .status(200)

@@ -55,7 +55,8 @@ const likeUnlikePost = asyncHandler(async (req: AuthenticatedRequest, res: Respo
         if (post.author.userId !== req.user.id) {
             const tokens = await prisma.fcmToken.findMany({
                 where: {
-                    userId: post.author.userId, //finding the token for the post author
+                    userId: post.author.userId,
+                    isActive: true //finding the token for the post author
                 },
                 select: {
                     token: true,
@@ -141,7 +142,8 @@ const likeUnlikeComment = asyncHandler(async (req: AuthenticatedRequest, res: Re
          if (comment.author.userId !== req.user.id) {
             const tokens = await prisma.fcmToken.findMany({
                 where: {
-                    userId: comment.author.userId, //finding the token for the author of the comment
+                    userId: comment.author.userId,
+                    isActive: true //finding the token for the author of the comment
                 },
                 select: {
                     token: true,

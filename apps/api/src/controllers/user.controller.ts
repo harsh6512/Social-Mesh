@@ -236,7 +236,9 @@ const updateUserDetails = asyncHandler(async (req: AuthenticatedRequest, res: Re
     });
     const updatedUser = sanitizeUser(user)
 
-    return res.status(200).json(new ApiResponse(200, updatedUser, "User updated successfully"));
+    return res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "User updated successfully"));
 });
 
 export {

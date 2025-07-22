@@ -80,6 +80,7 @@ const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: R
     const tokens = await prisma.fcmToken.findMany({
         where: {
             userId: followingProfile.userId,
+            isActive: true
         },
         select: {
             token: true,

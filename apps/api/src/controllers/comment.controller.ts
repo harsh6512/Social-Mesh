@@ -60,14 +60,15 @@ const postComment = asyncHandler(async (req: AuthenticatedRequest, res: Response
         const tokens = await prisma.fcmToken.findMany({
             where: {
                 userId: post.author.userId, //finding the token for the post author
+                isActive: true
             },
             select: {
                 token: true,
             }
         })
 
-        const tokenStrings = tokens.map((t:  { token: string }) => t.token)
-        
+        const tokenStrings = tokens.map((t: { token: string }) => t.token)
+
         await sendNotification(
             tokenStrings,
             {

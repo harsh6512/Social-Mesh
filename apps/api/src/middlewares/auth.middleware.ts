@@ -28,7 +28,10 @@ export const verifyJWT = asyncHandler(async (req: Request, _: Response, next: Ne
 
         if (!user.profile?.id) throw new ApiError(403, "Complete your profile to perform this action")
 
-        const safeUser = sanitizeUser(user)
+        const safeUser = {
+           ...sanitizeUser(user),
+          ...(decodedToken.deviceId && { deviceId: decodedToken.deviceId })
+        }
         req.user = safeUser;
         next();
     } catch (error: unknown) {

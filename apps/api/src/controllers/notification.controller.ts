@@ -2,22 +2,34 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { ApiError } from '../utils/ApiError.js';
-import { Response } from 'express';
+import { Response, CookieOptions } from 'express';
 import { prisma } from '../db/index.js';
 import crypto from 'crypto';
 import { NotificationSchemas } from '@repo/common/schemas';
 import { validationErrors } from '../utils/validationErrors.js';
+import { generateAccessToken } from '../services/jwt.service.js';
 
 const registerFcmToken = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const token = req.body.token;
     if (!token) throw new ApiError(400, "FCM token is required");
 
-    const validationResult = NotificationSchemas.tokenSchema.safeParse({ token })
-    if (!validationResult.success) validationErrors(validationResult)
+    const validationResult = NotificationSchemas.tokenSchema.safeParse({ token });
+    if (!validationResult.success) validationErrors(validationResult);
 
-    const existingToken = await prisma.fcmToken.findUnique({
+    const newDeviceId = crypto.randomUUID();
+
+    const result = await prisma.fcmToken.upsert({
         where: {
             token: token,
+        },
+        update: {
+            isActive: true,
+            userId: req.user.id
+        },
+        create: {
+            token: token,
+            deviceId: newDeviceId,
+            userId: req.user.id,
         },
         select: {
             id: true,
@@ -25,39 +37,28 @@ const registerFcmToken = asyncHandler(async (req: AuthenticatedRequest, res: Res
         }
     });
 
-    if (existingToken) {
-        await prisma.fcmToken.updateMany({
-            where: {
-                token: token,
-                userId:req.user.id,
-            },
-            data: {
-                isActive: true,
-            }
-        });
-
-        return res
-            .status(200)
-            .json(new ApiResponse(200, {}, "FCM Token updated successfully"));
+    const jwtPayload = {
+        id: req.user.id,
+        email: req.user.email,
+        fullName: req.user.fullName,
+        username: req.user.username,
+        deviceId: result.deviceId,
     }
 
-    const deviceId = crypto.randomUUID();
+    const accessToken = generateAccessToken(jwtPayload)
+    const options: CookieOptions = {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
 
-    await prisma.fcmToken.create({
-        data: {
-            token: token,
-            deviceId: deviceId,
-            userId:req.user.id,
-        },
-        select: {
-            id: true,
-        }
-    });
-
+    res.clearCookie("accessToken", options)
 
     return res
-        .status(201)
-        .json(new ApiResponse(201, {}, "FCM Token created successfully"));
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .json(new ApiResponse(200, { deviceId: result.deviceId }, "Fcm token registration done"))
 });
 
 export {

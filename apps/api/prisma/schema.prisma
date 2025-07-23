@@ -144,8 +144,9 @@ model FcmToken {
   isActive  Boolean  @default(true)
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-
+  createdAt DateTime @default(now()) 
+  updatedAt DateTime @default(now())
+  
   @@unique([userId, deviceId])
 }
 

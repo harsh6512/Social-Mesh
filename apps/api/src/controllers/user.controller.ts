@@ -150,29 +150,66 @@ const resetPassword = asyncHandler(async (req: Request, res: Response) => {
 })
 
 const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
-    const token = req.cookies?.refreshToken
-    if (!token) {
-        throw new ApiError(401, "Unauthorized Request")
+    const refreshtoken = req.cookies?.refreshToken;
+    const accessToken = req.cookies?.accessToken;
+
+    if (!refreshtoken) {
+        throw new ApiError(401, "Unauthorized Request");
     }
 
     try {
-        const decodedToken = jwt.verify(token, ENV.REFRESH_TOKEN_SECRET) as jwt.JwtPayload
-        if (typeof decodedToken !== "object" || !("id" in decodedToken)) {
-            throw new ApiError(401, "Invalid token payload");
+        const decodedRefreshToken = jwt.verify(refreshtoken, ENV.REFRESH_TOKEN_SECRET) as jwt.JwtPayload;
+
+        if (typeof decodedRefreshToken !== "object" || !("id" in decodedRefreshToken)) {
+            throw new ApiError(401, "Invalid refresh token payload");
         }
 
         const user = await prisma.user.findUnique({
             where: {
-                id: decodedToken.id
+                id: decodedRefreshToken.id
             },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                fullName: true,
+                refreshToken: true,
+            }
         });
 
-        if (token != user?.refreshToken) {
-            throw new ApiError(401, "Refresh token is expired or used")
+        if (!user) {
+            throw new ApiError(401, "User not found");
         }
 
-        const safeUser = sanitizeUser(user)
-        const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(safeUser)
+        if (refreshtoken !== user.refreshToken) {
+            throw new ApiError(401, "Refresh token is expired or used");
+        }
+
+        /**
+         * Attempt to extract deviceId from the expired accessToken.
+         * This helps preserve device information in the next token.
+         */
+        let deviceId = null;
+        if (accessToken) {
+            try {
+                const decodedAccessToken = jwt.decode(accessToken) as jwt.JwtPayload;
+                if (decodedAccessToken && typeof decodedAccessToken === "object" && "deviceId" in decodedAccessToken) {
+                    deviceId = decodedAccessToken.deviceId;
+                }
+            } catch (error) {
+                console.warn("Could not decode access token:", error);
+            }
+        }
+
+        const jwtPayload = {
+            id: user.id,
+            email: user.email,
+            fullName: user.fullName,
+            username: user.username,
+            ...(deviceId && { deviceId: deviceId })
+        };
+
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = await generateAccessAndRefreshTokens(jwtPayload);
 
         const options: CookieOptions = {
             httpOnly: true,
@@ -183,16 +220,16 @@ const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
 
         return res
             .status(200)
-            .cookie("accessToken", accessToken, options)
-            .cookie("refreshToken", refreshToken, options)
+            .cookie("accessToken", newAccessToken, options)
+            .cookie("refreshToken", newRefreshToken, options)
             .json(
-                new ApiResponse(200, safeUser, "Acces Token Refreshed")
+                new ApiResponse(200, user, "Access Token Refreshed")
             );
 
     } catch (error: any) {
-        throw new ApiError(401, error?.message || "Invalid refresh token")
+        throw new ApiError(401, error?.message || "Invalid refresh token");
     }
-})
+});
 
 const getCurrentUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     return res
@@ -237,8 +274,8 @@ const updateUserDetails = asyncHandler(async (req: AuthenticatedRequest, res: Re
     const updatedUser = sanitizeUser(user)
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, updatedUser, "User updated successfully"));
+        .status(200)
+        .json(new ApiResponse(200, updatedUser, "User updated successfully"));
 });
 
 export {

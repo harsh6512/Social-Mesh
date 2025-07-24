@@ -128,11 +128,25 @@ const signin = asyncHandler(async (req: Request, res: Response) => {
 })
 
 const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    //Update the user refresh token
     await prisma.user.update({
         where: { id: req.user.id },
         data: { refreshToken: null }
-    })
+    });
 
+    // Update the current deive fcm token of the user 
+    if (req.user.deviceId) {
+        await prisma.fcmToken.updateMany({
+            where: {
+                userId: req.user.id,
+                deviceId: req.user.deviceId
+            },
+            data: {
+                isActive: false
+            }
+        });
+    }
+    
     const options: CookieOptions = {
         httpOnly: true,
         secure: true,

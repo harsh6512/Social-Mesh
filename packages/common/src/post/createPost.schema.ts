@@ -3,12 +3,12 @@ import {z} from 'zod'
 export const createPostSchema = z.discriminatedUnion('postType', [
   z.object({
     postType: z.literal('Image'),
-    imageUrl: z.string(),
+    mediaUrl: z.string(),
     caption: z.string().max(500,"Caption is too long (maximum 500 characters)").trim().optional(),
   }),
   z.object({
     postType: z.literal('Video'),
-    videoUrl: z.string(),
+    mediaUrl: z.string(),
     thumbnailUrl: z.string().optional(), 
     caption: z.string().max(500,"Caption is too long (maximum 500 characters)").trim().optional(),
   }),

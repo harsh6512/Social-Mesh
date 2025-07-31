@@ -52,9 +52,9 @@ model Post {
   caption     String?  @db.VarChar(500)
   isPublished Boolean  @default(true)
 
-  imagePost ImagePost?
-  videoPost VideoPost?
-  tweetPost TweetPost?
+  mediaUrl     String?   // Optional: Images/videos always have media, but tweets may be text-only
+  thumbnailUrl String?   // Optional: Only used for video posts to show preview image
+  duration     Int?      // Optional: Only used for video posts (duration in seconds)
 
   comments  Comment[]
   authorId  Int
@@ -62,32 +62,6 @@ model Post {
   postLikes PostLike[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
-}
-
-model ImagePost {
-  id       Int    @id @default(autoincrement())
-  imageUrl String
-
-  postId Int  @unique
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-}
-
-model VideoPost {
-  id           Int     @id @default(autoincrement())
-  videoUrl     String
-  thumbnailUrl String?
-  duration     Int
-
-  postId Int  @unique
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-}
-
-model TweetPost {
-  id       Int     @id @default(autoincrement())
-  mediaUrl String?
-
-  postId Int  @unique
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
 
 model Comment {

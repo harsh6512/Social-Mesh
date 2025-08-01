@@ -16,7 +16,6 @@ import { PostResult } from '../types/post.types.js';
 
 import { PostType } from '../generated/prisma/index.js';
 
-
 const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postType = req.params.postType
     const { caption } = req.body
@@ -29,6 +28,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
     const files = req.files as MulterFiles | undefined
     const mediaUrl = files?.media?.[0]?.path
 
+    console.log(mediaUrl)
     const uploadMedia = async (filePath: string) => {
         const uploaded = await uploadOnCloudinary(filePath)
         if (!uploaded?.url) throw new ApiError(400, "Error while uploading media")
@@ -39,7 +39,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
         case "Image": {
             const userInput = {
                 postType,
-                imageUrl: mediaUrl,
+                mediaUrl,
                 caption
             }
 
@@ -54,23 +54,16 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                     caption,
                     isPublished: true,
                     authorId: req.user.profile.id,
-                    imagePost: {
-                        create: {
-                            imageUrl: uploaded.url,
-                        },
-                    }
+                    mediaUrl: uploaded.url,
                 },
                 select: {
                     id: true,
                     type: true,
                     caption: true,
                     isPublished: true,
-                    imagePost: {
-                        select: {
-                            id: true,
-                            imageUrl: true,
-                        }
-                    }
+                    mediaUrl: true,
+                    createdAt: true,
+                    updatedAt: true,
                 }
             })
 
@@ -83,7 +76,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
             const thumbnailUrl = files?.thumbnail?.[0]?.path
             const userInput = {
                 postType,
-                videoUrl: mediaUrl,
+                mediaUrl,
                 thumbnailUrl,
                 caption
             }
@@ -104,26 +97,19 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                     caption,
                     isPublished: true,
                     authorId: req.user.profile.id,
-                    videoPost: {
-                        create: {
-                            videoUrl: videoUploaded.url,
-                            thumbnailUrl: thumbnailUploaded?.url || null,
-                            duration: videoUploaded.duration || 0,
-                        },
-                    }
+                    mediaUrl: videoUploaded.url,
+                    thumbnailUrl: thumbnailUploaded?.url || null,
+                    duration: videoUploaded.duration || 0,
                 },
                 select: {
                     id: true,
                     type: true,
                     caption: true,
                     isPublished: true,
-                    videoPost: {
-                        select: {
-                            id: true,
-                            videoUrl: true,
-                            thumbnailUrl: true,
-                        }
-                    }
+                    mediaUrl: true,
+                    thumbnailUrl: true,
+                    createdAt: true,
+                    updatedAt: true,
                 }
             })
 
@@ -152,11 +138,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                     caption,
                     isPublished: true,
                     authorId: req.user.profile.id,
-                    tweetPost: {
-                        create: {
-                            mediaUrl: uploadedMediaUrl,
-                        },
-                    }
+                    mediaUrl: uploadedMediaUrl,
                 }, select: {
                     id: true,
                     type: true,
@@ -164,23 +146,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                     isPublished: true,
                     createdAt: true,
                     updatedAt: true,
-                    author: {
-                        select: {
-                            user: {
-                                select: {
-                                    id: true,
-                                    username: true,
-                                    fullName: true,
-                                }
-                            }
-                        }
-                    },
-                    tweetPost: {
-                        select: {
-                            id: true,
-                            mediaUrl: true,
-                        }
-                    }
+                    mediaUrl: true,
                 }
             })
 
@@ -238,7 +204,6 @@ const updatePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
                 id: true,
                 authorId: true,
                 caption: true,
-                type: true,
             }
         }),
         PostSchemas.updatePostSchema.safeParse({ caption })
@@ -249,15 +214,6 @@ const updatePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
     if (!validationResult.success) validationErrors(validationResult)
 
     if (post.authorId != req.user.profile.id) throw new ApiError(403, "Unauthorized Request")
-
-    const mediaIncludes = {
-        Image: { imagePost: { select: { id: true, imageUrl: true } } },
-        Video: { videoPost: { select: { id: true, videoUrl: true, thumbnailUrl: true } } },
-        Tweet: { tweetPost: { select: { id: true, mediaurl: true } } },
-    }
-
-    const type = post.type as PostType
-    const includeMedia = mediaIncludes[type] || {}
 
     const updatedPost = await prisma.post.update({
         where: { id: postId },
@@ -273,16 +229,17 @@ const updatePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
             updatedAt: true,
             author: {
                 select: {
+                    profilePic: true,
                     user: {
                         select: {
-                            id: true,
                             username: true,
-                            fullName: true,
                         }
                     }
                 }
             },
-            ...includeMedia
+            mediaUrl: true,
+            thumbnailUrl: true,
+            duration: true
         }
     })
 
@@ -330,32 +287,19 @@ const getPostById = asyncHandler(async (req: AuthenticatedRequest, res: Response
     const postId = parseInt(postIdParam)
     if (isNaN(postId)) throw new ApiError(400, "Invalid post id")
 
-    const postType = await prisma.post.findUnique({
+    const post = await prisma.post.findUnique({
         where: {
             id: postId,
-        },
-        select: {
-            type: true,
-        }
-    })
-    const mediaIncludes = {
-        Image: { imagePost: { select: { id: true, imageUrl: true } } },
-        Video: { videoPost: { select: { id: true, videoUrl: true, thumbnailUrl: true } } },
-        Tweet: { tweetPost: { select: { id: true, mediaurl: true } } },
-    }
-
-    const type = postType.type as PostType
-    const includeMedia = mediaIncludes[type] || {}
-
-    const post = await prisma.post.findFirst({
-        where: {
-            id: postId,
+            isPublished: true,
         },
         select: {
             id: true,
             type: true,
             isPublished: true,
             caption: true,
+            mediaUrl: true,
+            thumbnailUrl: true,
+            duration: true,
             author: {
                 select: {
                     profilePic: true,
@@ -372,40 +316,10 @@ const getPostById = asyncHandler(async (req: AuthenticatedRequest, res: Response
                     postLikes: true,
                 }
             },
-            ...includeMedia
         }
     })
-    if (!post || !post.isPublished) throw new ApiError(404, "Post not found")
 
-    type PostResult = {
-        id: number;
-        type: "Image" | "Video" | "Tweet";
-        isPublished: boolean;
-        caption?: string | null;
-        author: {
-            profilePic: string | null;
-            user: {
-                username: string;
-            };
-        };
-        _count: {
-            comments: number;
-            postLikes: number;
-        };
-        imagePost?: {
-            id: number;
-            imageUrl: string;
-        };
-        videoPost?: {
-            id: number;
-            videoUrl: string;
-            thumbnailUrl: string | null;
-        };
-        tweetPost?: {
-            id: number;
-            mediaUrl: string;
-        };
-    };
+    if (!post || !post.isPublished) throw new ApiError(404, "Post not found")
 
     const formattedPost = (post: PostResult) => ({
         id: post.id,
@@ -418,14 +332,9 @@ const getPostById = asyncHandler(async (req: AuthenticatedRequest, res: Response
         },
         totalComments: post._count.comments,
         totalLikes: post._count.postLikes,
-        media:
-            post.type === "Image"
-                ? post.imagePost
-                : post.type === "Video"
-                    ? post.videoPost
-                    : post.type === "Tweet"
-                        ? post.tweetPost
-                        : null,
+        mediaUrl: post.mediaUrl,
+        thumbnail: post.thumbnailUrl,
+        duration:post.duration,
     });
 
     return res
@@ -445,23 +354,9 @@ const getDraftPosts = asyncHandler(async (req: AuthenticatedRequest, res: Respon
             id: true,
             type: true,
             caption: true,
-            imagePost: {
-                select: {
-                    imageUrl: true
-                }
-            },
-            videoPost: {
-                select: {
-                    videoUrl: true,
-                    thumbnailUrl: true,
-                    duration: true
-                }
-            },
-            tweetPost: {
-                select: {
-                    mediaUrl: true
-                }
-            }
+            mediaUrl: true,
+            thumbnailUrl: true,
+            duration: true,
         }
     });
 
@@ -525,31 +420,15 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
                         postLikes: true
                     }
                 },
-                imagePost: {
-                    select: {
-                        id: true,
-                        imageUrl: true
-                    }
-                },
-                videoPost: {
-                    select: {
-                        id: true,
-                        videoUrl: true,
-                        thumbnailUrl: true
-                    }
-                },
-                tweetPost: {
-                    select: {
-                        id: true,
-                        mediaUrl: true
-                    }
-                }
+                mediaUrl: true,
+                thumbnailUrl: true,
+                duration: true,
             }
         });
 
-       //If all the following posts is fetched mark as done
+        //If all the following posts is fetched mark as done
         if (posts.length <= limit) {
-           await redis.set(redisKey, 'true', 'EX', 3600); // expires in 1 hour
+            await redis.set(redisKey, 'true', 'EX', 3600); // expires in 1 hour
         }
     }
 
@@ -590,25 +469,9 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
                         postLikes: true
                     }
                 },
-                imagePost: {
-                    select: {
-                        id: true,
-                        imageUrl: true
-                    }
-                },
-                videoPost: {
-                    select: {
-                        id: true,
-                        videoUrl: true,
-                        thumbnailUrl: true
-                    }
-                },
-                tweetPost: {
-                    select: {
-                        id: true,
-                        mediaUrl: true
-                    }
-                }
+                mediaUrl: true,
+                thumbnailUrl: true,
+                duration: true,
             }
         });
     }
@@ -627,41 +490,35 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
         },
         totalComments: post._count.comments,
         totalLikes: post._count.postLikes,
-        media:
-            post.type === "Image"
-                ? post.imagePost
-                : post.type === "Video"
-                    ? post.videoPost
-                    : post.type === "Tweet"
-                        ? post.tweetPost
-                        : null,
+        mediaUrl: post.mediaUrl,
+        thumbnail: post.thumbnailUrl,
+        duration:post.duration,
     });
 
     return res.status(200).json(
         new ApiResponse(200, {
-            posts:trimmedPosts.map(formattedPost), 
+            posts: trimmedPosts.map(formattedPost),
             hasNextPage,
             nextCursor,
         }, "Home posts fetched successfully")
     );
 });
 
-//User can filter what type fo content they want to see
+//User can filter what type of content they want to see
 const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const userProfileId = req.user.profile.id;
     const type = req.params.type;
-    
-    if (!type) throw new ApiError(400, "Post type is required");
-    const validationResult=PostSchemas.postTypeSchema.safeParse(type)
 
-    if(!validationResult.success) validationErrors(validationResult)
+    if (!type) throw new ApiError(400, "Post type is required");
+    
+    const validationResult = PostSchemas.postTypeSchema.safeParse({type})
+    if (!validationResult.success) validationErrors(validationResult)
 
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
     const cursorParam = req.query.cursor as string | undefined;
 
     const cursor = cursorParam ? parseInt(cursorParam) : undefined;
     if (cursorParam && isNaN(cursor!)) throw new ApiError(400, "Invalid cursor Id");
-
 
     const redisKey = `user:${userProfileId}:followingFeedDone:${type}`;
     let followingFeedDone = await redis.get(redisKey);
@@ -704,31 +561,15 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
                         postLikes: true
                     }
                 },
-                imagePost: {
-                    select: {
-                        id: true,
-                        imageUrl: true
-                    }
-                },
-                videoPost: {
-                    select: {
-                        id: true,
-                        videoUrl: true,
-                        thumbnailUrl: true
-                    }
-                },
-                tweetPost: {
-                    select: {
-                        id: true,
-                        mediaUrl: true
-                    }
-                }
+                mediaUrl: true,
+                thumbnailUrl: true,
+                duration: true,
             }
         });
 
         // If all the following posts is fetched mark as done
         if (posts.length <= limit) {
-            await redis.set(redisKey, 'true', 'EX', 3600) 
+            await redis.set(redisKey, 'true', 'EX', 3600)
         }
     }
 
@@ -770,29 +611,11 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
                         postLikes: true
                     }
                 },
-                imagePost: {
-                    select: {
-                        id: true,
-                        imageUrl: true
-                    }
-                },
-                videoPost: {
-                    select: {
-                        id: true,
-                        videoUrl: true,
-                        thumbnailUrl: true
-                    }
-                },
-                tweetPost: {
-                    select: {
-                        id: true,
-                        mediaUrl: true
-                    }
-                }
+                
             }
         });
     }
-    
+
     const hasNextPage = posts.length > limit;
     const trimmedPosts = hasNextPage ? posts.slice(0, limit) : posts;
     const nextCursor = hasNextPage ? trimmedPosts[trimmedPosts.length - 1]?.id : null;
@@ -807,20 +630,15 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
             profilePic: post.author.profilePic,
         },
         totalComments: post._count.comments,
-        totalLikes: post._count.postLikes,
-        media:
-            post.type === "Image"
-                ? post.imagePost
-                : post.type === "Video"
-                    ? post.videoPost
-                    : post.type === "Tweet"
-                        ? post.tweetPost
-                        : null,
+        totalLikes: post._count.postLikes, 
+        mediaUrl: post.mediaUrl,
+        thumbnail: post.thumbnailUrl,
+        duration:post.duration,
     });
 
     return res.status(200).json(
         new ApiResponse(200, {
-            posts: trimmedPosts.map(formattedPost), 
+            posts: trimmedPosts.map(formattedPost),
             hasNextPage,
             nextCursor,
         }, `${type} posts fetched successfully`)

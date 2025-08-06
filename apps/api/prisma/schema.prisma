@@ -60,6 +60,8 @@ model Post {
   authorId  Int
   author    Profile    @relation(fields: [authorId], references: [id], onDelete: Cascade)
   postLikes PostLike[]
+  notifications Notification[] @relation("PostNotifications")
+  
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
@@ -132,6 +134,7 @@ model Notification {
   recipientId Int
   recipient   User             @relation("ReceivedNotifications", fields: [recipientId], references: [id], onDelete: Cascade)
   postId      Int?
+  post        Post?            @relation("PostNotifications", fields: [postId], references: [id], onDelete: Cascade)
   message     String
   isRead      Boolean          @default(false)
   createdAt   DateTime         @default(now())

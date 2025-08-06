@@ -2,7 +2,7 @@
 export type PostResult = {
   id: number;
   type: "Image" | "Video" | "Tweet";
-  isPublished?: boolean; //not every time isPublished will be selected in query
+  isPublished?: boolean; // Optional: not every time isPublished will be selected in query
   caption?: string | null;
   author: {
     profilePic: string | null;
@@ -10,21 +10,11 @@ export type PostResult = {
       username: string;
     };
   };
-  _count: {
+  _count: { // Optional: not every time count will be selected in query
     comments: number;
     postLikes: number;
   };
-  imagePost?: {
-    id: number;
-    imageUrl: string;
-  };
-  videoPost?: {
-    id: number;
-    videoUrl: string;
-    thumbnailUrl: string | null;
-  };
-  tweetPost?: {
-    id: number;
-    mediaUrl: string;
-  };
+  mediaUrl: string | null;
+  thumbnailUrl: string | null;
+  duration: number | null
 };

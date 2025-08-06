@@ -27,8 +27,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
 
     const files = req.files as MulterFiles | undefined
     const mediaUrl = files?.media?.[0]?.path
-
-    console.log(mediaUrl)
+    
     const uploadMedia = async (filePath: string) => {
         const uploaded = await uploadOnCloudinary(filePath)
         if (!uploaded?.url) throw new ApiError(400, "Error while uploading media")
@@ -624,7 +623,6 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
         id: post.id,
         type: post.type,
         caption: post.caption,
-        isPublished: post.isPublished,
         author: {
             username: post.author.user.username,
             profilePic: post.author.profilePic,

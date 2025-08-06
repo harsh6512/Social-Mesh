@@ -284,6 +284,9 @@ const getUserLikedPosts = asyncHandler(async (req: AuthenticatedRequest, res: Re
             id: true,
             caption: true,
             type: true,
+            mediaUrl: true,
+            thumbnailUrl: true,
+            duration: true,
             author: {
                 select: {
                     profilePic: true,
@@ -300,32 +303,13 @@ const getUserLikedPosts = asyncHandler(async (req: AuthenticatedRequest, res: Re
                     postLikes: true
                 }
             },
-            imagePost: {
-                select: {
-                    id: true,
-                    imageUrl: true
-                }
-            },
-            videoPost: {
-                select: {
-                    id: true,
-                    videoUrl: true,
-                    thumbnailUrl: true
-                }
-            },
-            tweetPost: {
-                select: {
-                    id: true,
-                    mediaUrl: true
-                }
-            }
         }
     })
 
     if (posts.length === 0) {
-        return res.
-            status(200)
-            .json(new ApiResponse(200, { formattedPost: [], hasMore: false, nextCursor: null }, "No liked Posts yet"))
+        return res
+            .status(200)
+            .json(new ApiResponse(200, { posts: [], hasMore: false, nextCursor: null }, "No liked Posts yet"))
     }
 
     const hasMore = posts.length > limit
@@ -342,14 +326,9 @@ const getUserLikedPosts = asyncHandler(async (req: AuthenticatedRequest, res: Re
         },
         totalComments: post._count.comments,
         totalLikes: post._count.postLikes,
-        media:
-            post.type === "Image"
-                ? post.imagePost
-                : post.type === "Video"
-                    ? post.videoPost
-                    : post.type === "Tweet"
-                        ? post.tweetPost
-                        : null,
+        mediaUrl: post.mediaUrl,
+        thumbnail: post.thumbnailUrl,
+        duration: post.duration,
     }));
 
     return res

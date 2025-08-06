@@ -1,4 +1,4 @@
-import { admin,messaging } from "../lib/firebase.js";
+import { admin, messaging } from "../lib/firebase.js";
 import { prisma } from '../db/index.js'
 
 type NotificationPayload = {
@@ -15,7 +15,8 @@ export async function sendNotification(
   notification: NotificationPayload
 ) {
   try {
-    const message = tokens.length>0
+    console.log("In the notification service thing")
+    const message = tokens.length > 0
       ? {
         notification: {
           title: notification.type,//sending type of notification as title
@@ -49,8 +50,8 @@ export async function sendNotification(
         console.warn("⚠️ Failed tokens:", failed);
       }
     }
-
-    return {pushResult, dbResult}
+    
+    return { pushResult, dbResult }
   } catch (err) {
     console.error("❌ Error in sending or saving notification:", err);
     throw err;

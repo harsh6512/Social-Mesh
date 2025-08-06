@@ -4,12 +4,11 @@ import { ENV } from "../constants/env.js";
 import { prisma } from "../db/index.js"
 
 type AccessTokenPayload = Pick<User, "id" | "email" | "username" | "fullName"> & {
-  deviceId?: string; // Optional device ID
+  deviceId?: string; 
 }
 
 const generateAccessToken = (user: AccessTokenPayload): string => {
   const expiry = ENV.ACCESS_TOKEN_EXPIRY as "1h" | "2d" | "30m";
-  
   return jwt.sign(
     {
       id: user.id,

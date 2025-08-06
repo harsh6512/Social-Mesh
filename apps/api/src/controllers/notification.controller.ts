@@ -79,6 +79,10 @@ const getUserNotifications = asyncHandler(async (req: AuthenticatedRequest, res:
             profile: {
                 profilePic: string
             }
+        },
+        post:{
+            mediaUrl:string |null,
+            thumbnailUrl:string |null
         }
     }
 
@@ -103,9 +107,15 @@ const getUserNotifications = asyncHandler(async (req: AuthenticatedRequest, res:
                             select: {
                                 profilePic: true,
                             }
-                        }
+                        },
                     }
                 },
+                post:{
+                            select:{
+                                mediaUrl:true,
+                                thumbnailUrl:true,
+                            }
+                        }
             }
         })
 
@@ -138,7 +148,9 @@ const getUserNotifications = asyncHandler(async (req: AuthenticatedRequest, res:
         type: n.type,
         message: n.message,
         isRead: n.isRead,
-        senderProfilePic: n.sender.profile.profilePic
+        senderProfilePic: n.sender.profile.profilePic,
+        mediaUrl:n.post.mediaUrl,
+        thumbnailUrl:n.post.thumbnailUrl
     }))
 
     return res

@@ -15,7 +15,6 @@ export async function sendNotification(
   notification: NotificationPayload
 ) {
   try {
-    console.log("In the notification service thing")
     const message = tokens.length > 0
       ? {
         notification: {

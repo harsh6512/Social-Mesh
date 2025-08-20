@@ -110,7 +110,7 @@ const getUserNotifications = asyncHandler(async (req: AuthenticatedRequest, res:
                         },
                     }
                 },
-                post: {
+                post:{
                     select: {
                         mediaUrl: true,
                         thumbnailUrl: true,

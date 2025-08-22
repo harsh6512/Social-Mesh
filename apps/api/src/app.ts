@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors'
 import passport from 'passport'
 import './lib/passport.js'
+import './lib/janus.js'
 import { errorHandler } from './middlewares/errorHandler.middleware.js'
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';

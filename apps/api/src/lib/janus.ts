@@ -1,18 +1,20 @@
 import WebSocket from "ws";
 import { ENV } from "../constants/env.js";
 
-const janusWS = new WebSocket(ENV.JANUS_WS_URL);
+const JANUS_URL = ENV.JANUS_URL 
 
-janusWS.on("open", () => {
+const janus = new WebSocket(JANUS_URL,"janus-protocol");
+
+janus.on("open", () => {
   console.log("Connected to Janus WebSocket");
 });
 
-janusWS.on("error", (err) => {
-  console.error("Janus WS error:", err);
+janus.on("error", (err) => {
+  console.error("Janus connection error: ", err);
 });
 
-janusWS.on("close", () => {
-  console.log("Janus WS connection closed");
+janus.on("close", () => {
+  console.log("Janus connection closed");
 });
 
-export { janusWS };
+export { janus };

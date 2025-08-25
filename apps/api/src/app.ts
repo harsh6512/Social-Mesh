@@ -1,4 +1,5 @@
 import express from 'express';
+import http from 'http'
 import cors from 'cors'
 import passport from 'passport'
 import './lib/passport.js'
@@ -8,6 +9,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
 const app = express();
+const server=http.createServer(app)
 
 app.use(express.json());
 app.use(cors({
@@ -37,4 +39,4 @@ app.use('/api/v1/comments', commentRouter)
 app.use('/api/v1/notification', notificationRouter)
 app.use(errorHandler)
 
-export { app };
+export { server };

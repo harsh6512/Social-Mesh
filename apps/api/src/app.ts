@@ -1,5 +1,6 @@
 import express from 'express';
 import http from 'http'
+import { Server } from 'socket.io';
 import cors from 'cors'
 import passport from 'passport'
 import './lib/passport.js'
@@ -7,9 +8,10 @@ import './lib/janus.js'
 import { errorHandler } from './middlewares/errorHandler.middleware.js'
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { registerSockets } from './socket/index.js';
 
 const app = express();
-const server=http.createServer(app)
+const server = http.createServer(app)
 
 app.use(express.json());
 app.use(cors({
@@ -38,5 +40,14 @@ app.use('/api/v1/likes', likeRouter)
 app.use('/api/v1/comments', commentRouter)
 app.use('/api/v1/notification', notificationRouter)
 app.use(errorHandler)
+
+const io = new Server(server, {
+    cors: {
+        origin: process.env.CORS_ORIGIN,
+        credentials: true
+    }
+})
+
+registerSockets(io)
 
 export { server };

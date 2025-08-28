@@ -1,5 +1,6 @@
 import express from 'express';
 import http from 'http'
+import { ENV } from './constants/env.js';
 import { Server } from 'socket.io';
 import cors from 'cors'
 import passport from 'passport'
@@ -15,7 +16,7 @@ const server = http.createServer(app)
 
 app.use(express.json());
 app.use(cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: ENV.CORS_ORIGIN,
     credentials: true
 }));
 app.use(helmet());
@@ -43,7 +44,7 @@ app.use(errorHandler)
 
 const io = new Server(server, {
     cors: {
-        origin: process.env.CORS_ORIGIN,
+        origin: ENV.CORS_ORIGIN,
         credentials: true
     }
 })

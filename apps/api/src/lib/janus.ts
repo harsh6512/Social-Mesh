@@ -83,7 +83,7 @@ class Janus {
           request: "create",
           room: roomId,
           publishers: 2,
-          permanent: false 
+          permanent: false
         }
       })
       resolve(roomId)
@@ -108,6 +108,60 @@ class Janus {
         }
       });
       resolve(true);
+    });
+  }
+
+public async joinAsPublisher(roomId: number, display: string) {
+  if (!this.sessionId || !this.handleId) throw new Error("Janus not ready");
+
+  this.send({
+    janus: "message",
+    session_id: this.sessionId,
+    handle_id: this.handleId,
+    transaction: this.generateTransaction(),
+    body: {
+      request: "join",
+      room: roomId,
+      ptype: "publisher",
+      display
+    }
+  });
+}
+
+public async publish(roomId: number, offerSdp: string) {
+  if (!this.sessionId || !this.handleId) throw new Error("Janus not ready");
+
+  this.send({
+    janus: "message",
+    session_id: this.sessionId,
+    handle_id: this.handleId,
+    transaction: this.generateTransaction(),
+    body: {
+      request: "publish",
+      audio: true,
+      video: true
+    },
+    jsep: {
+      type: "offer",
+      sdp: offerSdp
+    }
+  });
+}
+
+  public async joinAsSubscriber(roomId:number,feedId:number) {
+    if (!this.sessionId || this.handleId) throw new Error("Janus not Ready")
+
+    this.send({
+      janus: "message",
+      session_id: this.sessionId,
+      handle_id: this.handleId,
+      transaction: this.generateTransaction(),
+      body: {
+        request: "join",
+        room: roomId,
+        ptype: "subscriber",
+        feed: feedId
+      }
     });
   }
 

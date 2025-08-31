@@ -65,8 +65,16 @@ class Janus {
     }
     // Handle transaction-based responses
     else if (transaction && this.pendingRequests.has(transaction)) {
+
+      // If the message is an "ack", just return (do nothing)
+      if (message.janus === "ack") {
+        return;
+      }
+
       const pendingRequest = this.pendingRequests.get(transaction)!;
       this.pendingRequests.delete(transaction);
+
+      console.log("here is the message that you are looking for", message)
 
       if (message.janus === "success") {
         pendingRequest.resolve({

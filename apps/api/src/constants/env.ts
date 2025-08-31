@@ -36,5 +36,5 @@ export const ENV = {
 
   FIREBASE_ADMIN_API:getEnv("FIREBASE_ADMIN_API"),
   JANUS_URL:getEnv("JANUS_URL"),
-  CORS_ORIGIN:getEnv("CORS_ORIGIN"),
+  CORS_ORIGIN:getEnv("CORS_ORIGIN","*"),
 };

@@ -16,7 +16,7 @@ const server = http.createServer(app)
 
 app.use(express.json());
 app.use(cors({
-    origin: ENV.CORS_ORIGIN,
+    origin: "*",
     credentials: true
 }));
 app.use(helmet());
@@ -44,7 +44,7 @@ app.use(errorHandler)
 
 const io = new Server(server, {
     cors: {
-        origin: ENV.CORS_ORIGIN,
+        origin: "*",
         credentials: true
     }
 })

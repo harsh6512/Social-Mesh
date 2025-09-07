@@ -286,6 +286,3 @@ class Janus {
     return !!(this.sessionId && this.handleId);
   }
 }
-
-const janus = new Janus();
-export { janus };

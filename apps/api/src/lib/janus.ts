@@ -8,19 +8,19 @@ interface PendingRequest {
 }
 
 class Janus {
-  private ws: WebSocket;
+  private static ws: WebSocket;
   private sessionId: number | null = null;
   private handleId: number | null = null;
   private JANUS_URL = ENV.JANUS_URL;
   private pendingRequests: Map<string, PendingRequest> = new Map();
 
   constructor() {
-    this.ws = new WebSocket(this.JANUS_URL, "janus-protocol");
+    Janus.ws = new WebSocket(this.JANUS_URL, "janus-protocol");
     this.setupEventHandlers();
   }
 
   private setupEventHandlers() {
-    this.ws.on("open", () => {
+    Janus.ws.on("open", () => {
       console.log("Connected to Janus WebSocket");
 
       this.send({
@@ -29,16 +29,16 @@ class Janus {
       });
     });
 
-    this.ws.on("message", (data) => {
+    Janus.ws.on("message", (data) => {
       const message = JSON.parse(data.toString());
       this.handleMessage(message);
     });
 
-    this.ws.on("error", (err) => {
+    Janus.ws.on("error", (err) => {
       console.log("Janus connection error: ", err);
     });
 
-    this.ws.on("close", () => {
+    Janus.ws.on("close", () => {
       console.error("Janus connection closed");
       this.sessionId = null;
       this.handleId = null;
@@ -265,8 +265,8 @@ class Janus {
   }
 
   private send(message: any) {
-    if (this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message));
+    if (Janus.ws.readyState === WebSocket.OPEN) {
+      Janus.ws.send(JSON.stringify(message));
     }
   }
 
@@ -286,3 +286,5 @@ class Janus {
     return !!(this.sessionId && this.handleId);
   }
 }
+
+export {Janus}

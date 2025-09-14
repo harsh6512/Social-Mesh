@@ -155,14 +155,13 @@ class Janus {
   }
 
   public async joinAsPublisher(roomId: number, display: string): Promise<any> {
+     const transaction = this.generateTransaction();
     return new Promise((resolve, reject) => {
       if (!this.sessionId || !this.publisherHandleId) {
         reject(new Error("Publisher handle not ready"));
         return;
       }
-
-      const transaction = this.generateTransaction();
-
+    console.log("This is the transaction id being send",transaction)
       Janus.connectionManager?.addPendingRequest(transaction, this, {
         resolve,
         reject,
@@ -247,11 +246,41 @@ class Janus {
     });
   }
 
+  public async doesFeedExist(roomId: number, feedId: number): Promise<boolean> {
+    if (!this.sessionId || !this.publisherHandleId) {
+        throw new Error("Session or publisher handle not ready");
+    }
+
+    return new Promise((resolve, reject) => {
+        const transaction = this.generateTransaction();
+
+        Janus.connectionManager?.addPendingRequest(transaction, this, {
+            resolve: (msg: any) => {
+                const publishers = msg.plugindata?.data?.publishers || [];
+                const exists = publishers.some((p: any) => p.id === feedId);
+                resolve(exists);
+            },
+            reject,
+            type: "checkFeed"
+        });
+
+        Janus.connectionManager?.send({
+            janus: "message",
+            session_id: this.sessionId,
+            handle_id: this.publisherHandleId,
+            transaction,
+            body: {
+                request: "listparticipants", // or "list" depending on plugin version
+                room: roomId
+            }
+        });
+    });
+}
+
   // to do:Maybe add the message condition to attach the handle id in this use case
   // Called by ConnectionManager when a message is routed to this instance
 public async processMessage(message: any, request: PendingRequest) {
-  if (message.janus === "ack") return;
-
+  
   if (message.janus === "success" && !this.sessionId && message.data?.id) {
     this.sessionId = message.data.id;
     console.log(`Session created: ${this.sessionId}`);

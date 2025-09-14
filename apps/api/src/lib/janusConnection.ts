@@ -12,15 +12,11 @@ class JanusConnectionManager {
   private static pendingRequests: Map<string, { instance: any, request: PendingRequest }> = new Map();
   private static isInitializing: boolean = false
 
-  constructor() {
-    if (!JanusConnectionManager.ws && !JanusConnectionManager.isInitializing) {
-      JanusConnectionManager.isInitializing = true;
-      JanusConnectionManager.initialize();
-    }
-  }
-
   public static async initialize() {
-    await JanusConnectionManager.setupConnection();
+    if (!JanusConnectionManager.ws && !JanusConnectionManager.isInitializing) {
+      JanusConnectionManager.isInitializing = true
+      await JanusConnectionManager.setupConnection();
+    }
   }
 
   public static setupConnection(): Promise<void> {
@@ -44,7 +40,7 @@ class JanusConnectionManager {
   }
 
   public addPendingRequest(transaction: string, instance: any, request: PendingRequest) {
-    if (!this.isConnectionReady()) console.error("WebSocket not open, cannot send message"); 
+    if (!this.isConnectionReady()) console.error("WebSocket not open, cannot send message");
     JanusConnectionManager.pendingRequests.set(transaction, { instance, request });
 
     // Auto-cleanup after 30 seconds
@@ -58,7 +54,7 @@ class JanusConnectionManager {
   }
 
   public send(message: any) {
-    if (!this.isConnectionReady()) console.error("WebSocket not open, cannot send message"); 
+    if (!this.isConnectionReady()) console.error("WebSocket not open, cannot send message");
 
     JanusConnectionManager.ws?.send(JSON.stringify(message));
   }
@@ -83,8 +79,10 @@ class JanusConnectionManager {
   }
 
   private static routeMessage(message: any) {
-    const { transaction } = message;
+    if (message.janus === "ack") return;
 
+    const { transaction } = message;
+    
     // Route messages with transactions directly to the requesting instance
     if (transaction && JanusConnectionManager.pendingRequests.has(transaction)) {
       const { instance, request } = JanusConnectionManager.pendingRequests.get(transaction)!;
@@ -95,7 +93,7 @@ class JanusConnectionManager {
     }
     // Handle events without transaction
     else if (message.janus === "event") {
-      console.log("Unhandled plugin event:", message.plugindata);
+      console.log("Unhandled plugin event:", message);
     }
     else if (message.janus === "error" && !transaction) {
       console.error("Unhandled Janus error:", message.error);
@@ -105,7 +103,7 @@ class JanusConnectionManager {
     }
   }
 
-  public isConnectionReady():boolean{
+  public isConnectionReady(): boolean {
     return JanusConnectionManager.ws?.readyState === WebSocket.OPEN
   }
 }

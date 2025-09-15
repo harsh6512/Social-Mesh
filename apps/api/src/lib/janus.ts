@@ -16,7 +16,6 @@ class Janus {
     if (!Janus.connectionManager) {
       Janus.connectionManager = new JanusConnectionManager();
     }
-    console.log("Inside the constructor");
   }
 
   public async connect() {
@@ -42,60 +41,86 @@ class Janus {
     });
   }
 
-  // look into this function
+  public async doesFeedExist(roomId: number, feedId: number): Promise<boolean> {
+    if (!this.sessionId || !this.publisherHandleId) {
+      throw new Error("Session or publisher handle not ready");
+    }
+
+    return new Promise((resolve, reject) => {
+      const transaction = this.generateTransaction();
+
+      Janus.connectionManager?.addPendingRequest(transaction, this, {
+        resolve: (msg: any) => {
+          const publishers = msg.plugindata?.data?.publishers || [];
+          const exists = publishers.some((p: any) => p.id === feedId);
+          resolve(exists);
+        },
+        reject,
+        type: "checkFeed"
+      });
+
+      Janus.connectionManager?.send({
+        janus: "message",
+        session_id: this.sessionId,
+        handle_id: this.publisherHandleId,
+        transaction,
+        body: {
+          request: "listparticipants", // or "list" depending on plugin version
+          room: roomId
+        }
+      });
+    });
+  }
+
+
+
   private async attachPublisherPlugin() {
     if (!this.sessionId) return;
 
     const transaction = this.generateTransaction();
 
-    return new Promise((resolve,reject)=>{
+    return new Promise((resolve, reject) => {
       Janus.connectionManager?.addPendingRequest(transaction, this, {
-      resolve,
-      reject: (error) => {
-        console.error("Publisher plugin attachment failed:", error);
-      },
-      type: "attachPublisher"
-    });
+        resolve,
+        reject: (error) => {
+          console.error("Publisher plugin attachment failed:", error);
+        },
+        type: "attachPublisher"
+      });
 
-    Janus.connectionManager?.send({
-      janus: "attach",
-      plugin: "janus.plugin.videoroom",
-      session_id: this.sessionId,
-      transaction
-    });
+      Janus.connectionManager?.send({
+        janus: "attach",
+        plugin: "janus.plugin.videoroom",
+        session_id: this.sessionId,
+        transaction
+      });
     })
   }
-  // look into this function
+
   private async attachSubscriberPlugin() {
-    console.log("Inside the subscriber handle plugin")
     if (!this.sessionId) return;
 
     const transaction = this.generateTransaction();
 
-    return new Promise((resolve,reject)=>{
+    return new Promise((resolve, reject) => {
       Janus.connectionManager?.addPendingRequest(transaction, this, {
-      resolve,
-      reject: (error) => {
-        console.error("Subscriber plugin attachment failed:", error);
-      },
-      type: "attachSubscriber"
-    });
+        resolve,
+        reject: (error) => {
+          console.error("Subscriber plugin attachment failed:", error);
+        },
+        type: "attachSubscriber"
+      });
 
-    Janus.connectionManager?.send({
-      janus: "attach",
-      plugin: "janus.plugin.videoroom",
-      session_id: this.sessionId,
-      transaction
-    });
+      Janus.connectionManager?.send({
+        janus: "attach",
+        plugin: "janus.plugin.videoroom",
+        session_id: this.sessionId,
+        transaction
+      });
     })
   }
 
   public async createRoom(): Promise<any> {
-    console.log("Inside the create room function")
-    console.log(this.sessionId)
-    console.log(this.subscriberHandleId)
-    console.log(this.publisherHandleId)
-
     return new Promise((resolve, reject) => {
       if (!this.sessionId || !this.publisherHandleId) {
         reject(new Error("Publisher handle not ready"));
@@ -155,13 +180,12 @@ class Janus {
   }
 
   public async joinAsPublisher(roomId: number, display: string): Promise<any> {
-     const transaction = this.generateTransaction();
+    const transaction = this.generateTransaction();
     return new Promise((resolve, reject) => {
       if (!this.sessionId || !this.publisherHandleId) {
         reject(new Error("Publisher handle not ready"));
         return;
       }
-    console.log("This is the transaction id being send",transaction)
       Janus.connectionManager?.addPendingRequest(transaction, this, {
         resolve,
         reject,
@@ -246,71 +270,70 @@ class Janus {
     });
   }
 
-  public async doesFeedExist(roomId: number, feedId: number): Promise<boolean> {
-    if (!this.sessionId || !this.publisherHandleId) {
-        throw new Error("Session or publisher handle not ready");
+  public async sendAnswerForSubscriber(roomId: number, answerSdp: string) {
+    if (!this.sessionId || !this.subscriberHandleId) {
+      throw new Error("Subscriber handle not ready");
     }
 
+    const transaction = this.generateTransaction();
+
     return new Promise((resolve, reject) => {
-        const transaction = this.generateTransaction();
+      Janus.connectionManager?.addPendingRequest(transaction, this, {
+        resolve,
+        reject,
+        type: "subscriberAnswer"
+      });
 
-        Janus.connectionManager?.addPendingRequest(transaction, this, {
-            resolve: (msg: any) => {
-                const publishers = msg.plugindata?.data?.publishers || [];
-                const exists = publishers.some((p: any) => p.id === feedId);
-                resolve(exists);
-            },
-            reject,
-            type: "checkFeed"
-        });
-
-        Janus.connectionManager?.send({
-            janus: "message",
-            session_id: this.sessionId,
-            handle_id: this.publisherHandleId,
-            transaction,
-            body: {
-                request: "listparticipants", // or "list" depending on plugin version
-                room: roomId
-            }
-        });
+      Janus.connectionManager?.send({
+        janus: "message",
+        session_id: this.sessionId,
+        handle_id: this.subscriberHandleId,
+        transaction,
+        body: {
+          request: "start",
+          room: roomId
+        },
+        jsep: {
+          type: "answer",
+          sdp: answerSdp
+        }
+      });
     });
-}
+  }
 
-  // to do:Maybe add the message condition to attach the handle id in this use case
   // Called by ConnectionManager when a message is routed to this instance
-public async processMessage(message: any, request: PendingRequest) {
-  
-  if (message.janus === "success" && !this.sessionId && message.data?.id) {
-    this.sessionId = message.data.id;
-    console.log(`Session created: ${this.sessionId}`);
-    await this.attachPublisherPlugin();
-  }
+  public async processMessage(message: any, request: PendingRequest) {
 
-  else if (message.janus === "success" && this.sessionId && message.data?.id && !this.publisherHandleId) {
-    this.publisherHandleId = message.data.id;
-    console.log(`Publisher handle created: ${this.publisherHandleId}`);
-    await this.attachSubscriberPlugin();
-  }
+    if (message.janus === "success" && !this.sessionId && message.data?.id) {
+      this.sessionId = message.data.id;
+      console.log(`Session created: ${this.sessionId}`);
+      await this.attachPublisherPlugin();
+    }
 
-  else if (message.janus === "success" && this.sessionId && message.data?.id && this.publisherHandleId && !this.subscriberHandleId) {
-    this.subscriberHandleId = message.data.id;
-    console.log(`Subscriber handle created: ${this.subscriberHandleId}`);
-    console.log(`Janus ready - Session: ${this.sessionId}, Publisher: ${this.publisherHandleId}, Subscriber: ${this.subscriberHandleId}`);
-  }
+    else if (message.janus === "success" && this.sessionId && message.data?.id && !this.publisherHandleId) {
+      this.publisherHandleId = message.data.id;
+      console.log(`Publisher handle created: ${this.publisherHandleId}`);
+      await this.attachSubscriberPlugin();
+    }
 
-  if (message.janus === "success" || message.janus === "event") {
-    request.resolve({
-      success: true,
-      data: message.data,
-      plugindata: message.plugindata,
-      jsep: message.jsep,
-      event: message.janus === "event"
-    });
-  } else if (message.janus === "error") {
-    request.reject(new Error(message.error?.reason || "Unknown error"));
+    else if (message.janus === "success" && this.sessionId && message.data?.id && this.publisherHandleId && !this.subscriberHandleId) {
+      this.subscriberHandleId = message.data.id;
+      console.log(`Subscriber handle created: ${this.subscriberHandleId}`);
+      console.log(`Janus ready - Session: ${this.sessionId}, Publisher: ${this.publisherHandleId}, Subscriber: ${this.subscriberHandleId}`);
+    }
+
+    if (message.janus === "success" || message.janus === "event") {
+      request.resolve({
+        success: true,
+        data: message.data,
+        plugindata: message.plugindata,
+        jsep: message.jsep,
+        event: message.janus === "event"
+      });
+    } else if (message.janus === "error") {
+      request.reject(new Error(message.error?.reason || "Unknown error"));
+    }
   }
-}
 
 
   private generateTransaction(): string {

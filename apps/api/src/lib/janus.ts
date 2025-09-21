@@ -355,6 +355,105 @@ class Janus {
   public isReady(): boolean {
     return !!(this.sessionId && this.publisherHandleId && this.subscriberHandleId);
   }
+
+  // Cleanup methods for proper resource management
+  public async destroySession(): Promise<any> {
+    if (!this.sessionId) {
+      console.log("No session to destroy");
+      return;
+    }
+
+    const transaction = this.generateTransaction();
+    return new Promise((resolve, reject) => {
+      Janus.connectionManager?.addPendingRequest(transaction, this, {
+        resolve: (msg: any) => {
+          console.log(`Session ${this.sessionId} destroyed`);
+          this.sessionId = null;
+          this.publisherHandleId = null;
+          this.subscriberHandleId = null;
+          resolve(msg);
+        },
+        reject: (error) => {
+          console.error("Session destruction failed:", error);
+          reject(error);
+        },
+        type: "destroySession"
+      });
+
+      Janus.connectionManager?.send({
+        janus: "destroy",
+        session_id: this.sessionId,
+        transaction
+      });
+    });
+  }
+
+  public async detachPublisherHandle(): Promise<any> {
+    if (!this.sessionId || !this.publisherHandleId) {
+      return;
+    }
+
+    const transaction = this.generateTransaction();
+    return new Promise((resolve, reject) => {
+      Janus.connectionManager?.addPendingRequest(transaction, this, {
+        resolve: (msg: any) => {
+          console.log(`Publisher handle ${this.publisherHandleId} detached`);
+          this.publisherHandleId = null;
+          resolve(msg);
+        },
+        reject,
+        type: "detachPublisher"
+      });
+
+      Janus.connectionManager?.send({
+        janus: "detach",
+        session_id: this.sessionId,
+        handle_id: this.publisherHandleId,
+        transaction
+      });
+    });
+  }
+
+  public async detachSubscriberHandle(): Promise<any> {
+    if (!this.sessionId || !this.subscriberHandleId) {
+      return;
+    }
+
+    const transaction = this.generateTransaction();
+    return new Promise((resolve, reject) => {
+      Janus.connectionManager?.addPendingRequest(transaction, this, {
+        resolve: (msg: any) => {
+          console.log(`Subscriber handle ${this.subscriberHandleId} detached`);
+          this.subscriberHandleId = null;
+          resolve(msg);
+        },
+        reject,
+        type: "detachSubscriber"
+      });
+
+      Janus.connectionManager?.send({
+        janus: "detach",
+        session_id: this.sessionId,
+        handle_id: this.subscriberHandleId,
+        transaction
+      });
+    });
+  }
+
+  public async cleanup(): Promise<void> {
+    try {
+      // Detach handles first
+      await Promise.all([
+        this.detachPublisherHandle(),
+        this.detachSubscriberHandle()
+      ]);
+      
+      // Then destroy session
+      await this.destroySession();
+    } catch (error) {
+      console.error("Error during Janus cleanup:", error);
+    }
+  }
 }
 
 export { Janus }

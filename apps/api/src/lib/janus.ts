@@ -456,4 +456,4 @@ class Janus {
 }
 
 const janus = new Janus()
-export { Janus };
+export { janus };

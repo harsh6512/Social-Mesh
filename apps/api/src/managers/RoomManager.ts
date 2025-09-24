@@ -1,5 +1,5 @@
 import { redis } from "../lib/redis.js"
-import { Server, Socket } from "socket.io";
+import { Namespace, Socket } from "socket.io";
 import { janus } from "../lib/janus.js"
 
 interface User {
@@ -8,9 +8,9 @@ interface User {
 }
 
 class RoomManager {
-    private io: Server | null = null
+    private io: Namespace | null = null
 
-    public setIOInstance(io: Server): void {
+    public setIOInstance(io: Namespace): void {
         this.io = io;
     }
 
@@ -116,7 +116,7 @@ class RoomManager {
     try {
         const janusData = await redis.hgetall(`janus:${clientSocket.id}`);
         const sessionId = Number(janusData.sessionId);
-        const publisherHandleId = Number(janusData.publisherHandleId); 
+        const publisherHandleId = Number(janusData.publisherHandleId);
         const roomId = Number(janusData.roomId);
 
         if (roomId) {
@@ -168,7 +168,6 @@ async handlerUserLeft(clientSocket: Socket) {
         console.error("Error in handlerUserLeft:", err);
     }
 }
-
 }
 
 const roomManager = new RoomManager()

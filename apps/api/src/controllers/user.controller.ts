@@ -45,18 +45,7 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
     if (!validationResult.success) {
         validationErrors(validationResult)
     }
-
-    const rateLimitKey = `otp-requests:${safeUser.email}`;
-    const currentCount = await redis.incr(rateLimitKey);
-
-    if (currentCount === 1) {
-        await redis.expire(rateLimitKey, 60 * 15);
-    }
-
-    if (currentCount > 3) {
-        throw new ApiError(429, "Too many OTP requests. Please try again after 15 minutes")
-    }
-
+    
     const OTP = generateOTP();
 
     const otpkey = `forgot-password:${safeUser.email}`;

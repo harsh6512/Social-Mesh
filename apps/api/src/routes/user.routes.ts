@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 import { verifyForgotPasswordToken } from "../middlewares/authForgetPasswordToken.middleware.js"
+import { otpLimiter } from "../middlewares/otpLimiter.middleware.js";
 import {
     forgotPassword,
     verifyOTP,
@@ -11,7 +12,7 @@ import {
 } from "../controllers/user.controller.js";
 const router = Router()
 
-router.route("/forgot-password").post(forgotPassword)
+router.route("/forgot-password").post(otpLimiter,forgotPassword)
 router.route("/verify-OTP").post(verifyForgotPasswordToken, verifyOTP)
 router.route("/reset-password").post(verifyForgotPasswordToken, resetPassword)
 router.route("/refresh-token").post(refreshAccessToken)

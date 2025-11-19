@@ -56,7 +56,12 @@ class RoomManager {
             const feedId = await janus.joinAsPublisher(roomId, display, sessionId, publisherHandleId);
 
             const remoteAnswerSdp = await janus.publish(roomId, sdp, sessionId, publisherHandleId);
-            clientSocket.emit("sdpAnswer", { remoteAnswerSdp })
+            console.log("A error might be here", remoteAnswerSdp)
+
+            clientSocket.emit("sdpAnswer", {
+                type: "answer",
+                sdp: remoteAnswerSdp
+            });
 
             const roomData = await redis.hgetall(`room:${roomId}`);
 
@@ -167,6 +172,14 @@ class RoomManager {
         } catch (err) {
             console.error("Error in handlerUserLeft:", err);
         }
+    }
+
+    public async handleTrickleCandidate(clientSocket: Socket, candidate: any) {
+        const janusData = await redis.hgetall(`janus:${clientSocket.id}`);
+        const sessionId = Number(janusData.sessionId);
+        const publisherHandleId = Number(janusData.publisherHandleId)
+
+        janus.sendTrickleCandidate(sessionId, publisherHandleId, candidate)
     }
 }
 

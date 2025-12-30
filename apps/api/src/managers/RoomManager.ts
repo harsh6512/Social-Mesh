@@ -1,6 +1,6 @@
 import { redis } from "../lib/redis.js"
-import { Namespace, Socket } from "socket.io";
-import { janus } from "../lib/janus.js"
+import crypto from "crypto";
+import { Namespace, Socket } from "socket.io"
 
 interface User {
     socket: Socket,
@@ -14,172 +14,95 @@ class RoomManager {
         this.io = io;
     }
 
-    public async initializeSessionAndHandles(user: User) {
-        const { sessionId, publisherHandleId, subscriberHandleId } = await janus.allocateSessionAndHandles()
-
-        await redis.hset(`janus:${user.socket.id}`, {
-            sessionId: sessionId,
-            publisherHandleId: publisherHandleId,
-            subscriberHandleId: subscriberHandleId,
-        });
-    }
-
-    public async createRoom(user1: User, user2: User) {
-
-        const janusData = await redis.hgetall(`janus:${user1.socket.id}`);
-        const sessionId = Number(janusData.sessionId);
-        const publisherHandleId = Number(janusData.publisherHandleId);
-
-        const roomId = await janus.createRoom(sessionId, publisherHandleId)
+    async createRoom(user1: User, user2: User) {
+        const roomId = this.generateRoomId();
 
         await redis.hset(`room:${roomId}`, {
             user1: JSON.stringify({ socketId: user1.socket.id, name: user1.name }),
             user2: JSON.stringify({ socketId: user2.socket.id, name: user2.name }),
-        });
+        })
 
-        await redis.hset(`janus:${user1.socket.id}`, { roomId });
-        await redis.hset(`janus:${user2.socket.id}`, { roomId });
+        user1.socket.emit("send-offer", {
+            roomId,
+        })
 
-        user1.socket.emit("start-publishing", { roomId });
-        user2.socket.emit("start-publishing", { roomId });
+        user2.socket.emit("send-answer", {
+            roomId,
+        })
 
     }
+    async onOffer(roomId: string, sdp: string, senderSocket: Socket) {
+        const roomData = await redis.hgetall(`room:${roomId}`);
 
-    public async handleUserPublish(sdp: string, display: string, clientSocket: Socket) {
-        try {
-            const janusData = await redis.hgetall(`janus:${clientSocket.id}`);
+        if (!roomData || Object.keys(roomData).length < 2) {
+            return;
+        }
 
-            const sessionId = Number(janusData.sessionId);
-            const publisherHandleId = Number(janusData.publisherHandleId);
-            const roomId = Number(janusData.roomId)
+        const user1 = JSON.parse(roomData.user1!);
+        const user2 = JSON.parse(roomData.user2!);
 
-            const feedId = await janus.joinAsPublisher(roomId, display, sessionId, publisherHandleId);
+        const receivingUser = user1.socketId === senderSocket.id ? user2 : user1;
 
-            const remoteAnswerSdp = await janus.publish(roomId, sdp, sessionId, publisherHandleId);
-            console.log("A error might be here", remoteAnswerSdp)
+        if (!receivingUser?.socketId) return;
 
-            clientSocket.emit("sdpAnswer", {
-                type: "answer",
-                sdp: remoteAnswerSdp
-            });
-
-            const roomData = await redis.hgetall(`room:${roomId}`);
-
-            const user1 = JSON.parse(roomData.user1!);
-            const user2 = JSON.parse(roomData.user2!);
-
-            // Find the peer socket
-            const peerSocketId = user1.socketId === clientSocket.id ? user2.socketId : user1.socketId;
-            const peerSocket = this.io?.sockets.get(peerSocketId);
-
-            if (!peerSocket) {
-                console.error("Peer socket not found:", peerSocketId);
-                return;
-            }
-
-            await this.handleUserSubscribe(peerSocket, roomId, feedId)
-        } catch (error) {
-            console.log("Error while joining as a publisher", error)
+        const receivingUserSocket = this.io?.sockets.get(receivingUser.socketId);
+        if (receivingUserSocket) {
+            receivingUserSocket.emit("offer", {
+                sdp,
+                roomId,
+            })
         }
     }
 
-    public async handleUserSubscribe(clientSocket: Socket, roomId: number, feedId: number) {
-        try {
-            const janusData = await redis.hgetall(`janus:${clientSocket.id}`);
+    async onAnswer(roomId: string, sdp: string, senderSocket: Socket) {
+        const roomData = await redis.hgetall(`room:${roomId}`);
 
-            const sessionId = Number(janusData.sessionId);
-            const subscriberHandleId = Number(janusData.subscriberHandleId);
-
-            const sdpoffer = await janus.joinAsSubscriber(roomId, feedId, sessionId, subscriberHandleId)
-            clientSocket.emit("sdpoffer", sdpoffer)
+        if (!roomData || Object.keys(roomData).length < 2) {
+            return;
         }
-        catch (error) {
-            console.log("Error while joining as subsciber", error)
-        }
-    }
 
-    public async handleSubscribeAnswer(clientSocket: Socket, sdp: string) {
-        try {
-            const janusData = await redis.hgetall(`janus:${clientSocket.id}`);
+        const user1 = JSON.parse(roomData.user1!);
+        const user2 = JSON.parse(roomData.user2!);
 
-            const sessionId = Number(janusData.sessionId);
-            const subscriberHandleId = Number(janusData.subscriberHandleId);
-            const roomId = Number(janusData.roomId);
+        const receivingUser = user1.socketId === senderSocket.id ? user2 : user1;
 
-            await janus.sendAnswerForSubscriber(roomId, sdp, sessionId, subscriberHandleId)
-        } catch (error) {
-            console.log("Error while sending subscribe answer", error);
-            clientSocket.emit("error", {
-                type: "Subscribe failed",
-                message: "Could not complete subscription",
-                code: 500,
-            });
+        if (!receivingUser?.socketId) return;
+
+        const receivingUserSocket = this.io?.sockets.get(receivingUser.socketId);
+        if (receivingUserSocket) {
+            receivingUserSocket.emit("answer", {
+                sdp,
+                roomId,
+            })
         }
     }
 
-    public async handleRoomLeft(clientSocket: Socket) {
-        try {
-            const janusData = await redis.hgetall(`janus:${clientSocket.id}`);
-            const sessionId = Number(janusData.sessionId);
-            const publisherHandleId = Number(janusData.publisherHandleId);
-            const roomId = Number(janusData.roomId);
+    async onIceCandidates(roomId: string, senderSocket: Socket, candidate: any) {
+        const roomData = await redis.hgetall(`room:${roomId}`);
 
-            if (roomId) {
-                await janus.destroyRoom(roomId, sessionId, publisherHandleId);
-                await redis.hdel(`janus:${clientSocket.id}`, "roomId");
+        if (!roomData || Object.keys(roomData).length < 2) {
+            return;
+        }
 
-                const roomData = await redis.hgetall(`room:${roomId}`);
-                await redis.del(`room:${roomId}`);
+        const user1 = JSON.parse(roomData.user1!);
+        const user2 = JSON.parse(roomData.user2!);
 
-                const user1 = JSON.parse(roomData.user1!);
-                const user2 = JSON.parse(roomData.user2!);
+        const receivingUser = user1.socketId === senderSocket.id ? user2 : user1;
 
-                const peerSocketId = user1.socketId === clientSocket.id ? user2.socketId : user1.socketId;
-                const peerSocket = this.io?.sockets.get(peerSocketId);
+        if (!receivingUser?.socketId) return;
 
-                if (peerSocket) {
-                    peerSocket.emit("Peer Left");
-                }
-            }
-        } catch (err) {
-            console.error("Error in handleRoomLeft:", err);
+        const receivingUserSocket = this.io?.sockets.get(receivingUser.socketId);
+        if (receivingUserSocket) {
+            receivingUserSocket.emit("add-ice-candidate", {
+                candidate,
+            })
         }
     }
 
-    public async handleUserLeft(clientSocket: Socket) {
-        try {
-            const janusData = await redis.hgetall(`janus:${clientSocket.id}`);
-            const sessionId = Number(janusData.sessionId);
-            const roomId = Number(janusData.roomId);
-
-            if (roomId) {
-                const roomData = await redis.hgetall(`room:${roomId}`);
-                await redis.del(`room:${roomId}`);
-
-                const user1 = JSON.parse(roomData.user1!);
-                const user2 = JSON.parse(roomData.user2!);
-
-                const peerSocketId = user1.socketId === clientSocket.id ? user2.socketId : user1.socketId;
-                const peerSocket = this.io?.sockets.get(peerSocketId);
-
-                if (peerSocket) {
-                    peerSocket.emit("Peer Left");
-                }
-            }
-
-            await redis.del(`janus:${clientSocket.id}`);
-            await janus.cleanup(sessionId);
-        } catch (err) {
-            console.error("Error in handlerUserLeft:", err);
-        }
-    }
-
-    public async handleTrickleCandidate(clientSocket: Socket, candidate: any) {
-        const janusData = await redis.hgetall(`janus:${clientSocket.id}`);
-        const sessionId = Number(janusData.sessionId);
-        const publisherHandleId = Number(janusData.publisherHandleId)
-
-        janus.sendTrickleCandidate(sessionId, publisherHandleId, candidate)
+    generateRoomId(): string {
+        const timestamp = Date.now().toString(36);
+        const randomPart = crypto.randomBytes(8).toString("hex");
+        return `${timestamp}${randomPart}`;
     }
 }
 

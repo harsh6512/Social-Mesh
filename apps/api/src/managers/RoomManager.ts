@@ -103,6 +103,68 @@ class RoomManager {
         }
     }
 
+    public async onUserDisconnected(socket: Socket) {
+        const userData = await redis.hgetall(`user:${socket.id}`);
+        const roomId = userData.roomId;
+
+        if (!roomId) {
+            // User was not in any room
+            return;
+        }
+
+        const roomData = await redis.hgetall(`room:${roomId}`);
+        if (!roomData || Object.keys(roomData).length < 2) {
+            await redis.del(`user:${socket.id}`);
+            return;
+        }
+
+        const user1 = JSON.parse(roomData.user1!);
+        const user2 = JSON.parse(roomData.user2!);
+
+        const remainingUser = user1.socketId === socket.id ? user2 : user1;
+        const remainingSocket = this.io?.sockets.get(remainingUser.socketId);
+
+        if (remainingSocket) {
+            remainingSocket.emit("peer-disconnected", {
+                roomId,
+            });
+        }
+
+        await redis.del(`room:${roomId}`);
+        await redis.del(`user:${socket.id}`);
+        await redis.del(`user:${remainingUser.socketId}`);
+    }
+
+    public async leaveRoom(socket: Socket) {
+        const userData = await redis.hgetall(`user:${socket.id}`);
+        const roomId = userData.roomId;
+
+        if (!roomId) {
+            return;
+        }
+
+        const roomData = await redis.hgetall(`room:${roomId}`);
+        if (!roomData || Object.keys(roomData).length < 2) {
+            await redis.del(`user:${socket.id}`);
+            return;
+        }
+
+        const user1 = JSON.parse(roomData.user1!);
+        const user2 = JSON.parse(roomData.user2!);
+
+        const remainingUser = user1.socketId === socket.id ? user2 : user1;
+        const remainingSocket = this.io?.sockets.get(remainingUser.socketId);
+        if (remainingSocket) {
+            remainingSocket.emit("peer-left", {
+                roomId,
+            });
+        }
+
+        await redis.del(`room:${roomId}`);
+        await redis.del(`user:${socket.id}`);
+        await redis.del(`user:${remainingUser.socketId}`);
+    }
+
     private generateRoomId(): string {
         const timestamp = Date.now().toString(36);
         const randomPart = crypto.randomBytes(8).toString("hex");

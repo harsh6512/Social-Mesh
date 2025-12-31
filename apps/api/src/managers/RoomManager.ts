@@ -14,13 +14,16 @@ class RoomManager {
         this.io = io;
     }
 
-    async createRoom(user1: User, user2: User) {
+    public async createRoom(user1: User, user2: User) {
         const roomId = this.generateRoomId();
 
         await redis.hset(`room:${roomId}`, {
             user1: JSON.stringify({ socketId: user1.socket.id, name: user1.name }),
             user2: JSON.stringify({ socketId: user2.socket.id, name: user2.name }),
         })
+
+        await redis.hset(`user:${user1.socket.id}`, { roomId });
+        await redis.hset(`user:${user2.socket.id}`, { roomId });
 
         user1.socket.emit("send-offer", {
             roomId,
@@ -31,7 +34,8 @@ class RoomManager {
         })
 
     }
-    async onOffer(roomId: string, sdp: string, senderSocket: Socket) {
+
+    public async onOffer(roomId: string, sdp: string, senderSocket: Socket) {
         const roomData = await redis.hgetall(`room:${roomId}`);
 
         if (!roomData || Object.keys(roomData).length < 2) {
@@ -54,7 +58,7 @@ class RoomManager {
         }
     }
 
-    async onAnswer(roomId: string, sdp: string, senderSocket: Socket) {
+    public async onAnswer(roomId: string, sdp: string, senderSocket: Socket) {
         const roomData = await redis.hgetall(`room:${roomId}`);
 
         if (!roomData || Object.keys(roomData).length < 2) {
@@ -77,7 +81,7 @@ class RoomManager {
         }
     }
 
-    async onIceCandidates(roomId: string, senderSocket: Socket, candidate: any) {
+    public async onIceCandidates(roomId: string, senderSocket: Socket, candidate: any) {
         const roomData = await redis.hgetall(`room:${roomId}`);
 
         if (!roomData || Object.keys(roomData).length < 2) {
@@ -99,7 +103,7 @@ class RoomManager {
         }
     }
 
-    generateRoomId(): string {
+    private generateRoomId(): string {
         const timestamp = Date.now().toString(36);
         const randomPart = crypto.randomBytes(8).toString("hex");
         return `${timestamp}${randomPart}`;

@@ -91,7 +91,9 @@ class QuickConnectManager {
                     { name: user1.name, socket: socket1 },
                     { name: user2.name, socket: socket2 }
                 );
-                
+
+                 // 100 ms delay to prevent CPU hogging
+                await new Promise(resolve => setTimeout(resolve, 100)); 
             }
         } catch (error) {
             console.error("Error in matching loop:", error);

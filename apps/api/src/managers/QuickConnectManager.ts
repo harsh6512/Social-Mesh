@@ -34,7 +34,6 @@ class QuickConnectManager {
 
     private startMatchingUsers(): void {
         if (this.isMatching) {
-            // Already running, don't start another instance
             return;
         }
 
@@ -63,25 +62,18 @@ class QuickConnectManager {
                 const user2Data = await redis.hget("users", socketId2);
 
                 if (!user1Data || !user2Data) {
-                    // If user1 is valid, requeue
-                    if (user1Data) {
-                        await redis.rpush("queue", socketId1);
-                    }
-                    // If user2 is valid, requeue
-                    if (user2Data) {
-                        await redis.rpush("queue", socketId2);
-                    }
+                    if (user1Data) await redis.rpush("queue", socketId1);
+                    if (user2Data) await redis.rpush("queue", socketId2);
                     continue;
                 }
 
-                const user1 = JSON.parse(user1Data)
-                const user2 = JSON.parse(user2Data)
+                const user1 = JSON.parse(user1Data);
+                const user2 = JSON.parse(user2Data);
 
                 const socket1 = this.io?.sockets.get(socketId1);
                 const socket2 = this.io?.sockets.get(socketId2);
 
                 if (!socket1 || !socket2) {
-                    console.log("One or both sockets disconnected");
                     if (socket1) await redis.rpush("queue", socketId1);
                     if (socket2) await redis.rpush("queue", socketId2);
                     continue;
@@ -92,35 +84,37 @@ class QuickConnectManager {
                     { name: user2.name, socket: socket2 }
                 );
 
-                 // 100 ms delay to prevent CPU hogging
-                await new Promise(resolve => setTimeout(resolve, 100)); 
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         } catch (error) {
             console.error("Error in matching loop:", error);
         } finally {
             this.isMatching = false;
-            console.log("Matching loop ended");
         }
     }
 
     private initHandlers(socket: Socket) {
         socket.on("room-left", async () => {
-            roomManager.leaveRoom(socket);
-            // Add back to queue
+            const remainingUserSocketId = await roomManager.leaveRoom(socket);
+
             await redis.rpush("queue", socket.id);
-            // Restart matching if needed
+
+            if (remainingUserSocketId) {
+                await redis.rpush("queue", remainingUserSocketId);
+            }
+
             this.startMatchingUsers();
         });
 
-        socket.on("offer", async ({ sdp, roomId }: { sdp: string, roomId: string }) => {
+        socket.on("offer", async ({ sdp, roomId }) => {
             await roomManager.onOffer(roomId, sdp, socket);
         });
 
-        socket.on("answer", async ({ sdp, roomId }: { sdp: string, roomId: string }) => {
+        socket.on("answer", async ({ sdp, roomId }) => {
             await roomManager.onAnswer(roomId, sdp, socket);
         });
 
-        socket.on("ice-candidate", async ({ candidate, roomId }: { candidate: any, roomId: string }) => {
+        socket.on("ice-candidate", async ({ candidate, roomId }) => {
             await roomManager.onIceCandidates(roomId, socket, candidate);
         });
     }

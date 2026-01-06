@@ -5,7 +5,7 @@ import { prisma } from '../db/index.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import { uploadOnCloudinary, deleteFromCloudinary } from '../utils/cloudinary.js';
 import { validationErrors } from '../utils/validationErrors.js';
 
 import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
@@ -67,38 +67,65 @@ const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Resp
 })
 
 const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user?.id
+  const userId = req.user?.id;
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
-  const { bio } = req.body ?? {}
-  const profilePic = req.file?.path
+  const { bio } = req.body ?? {};
+  const profilePic = req.file?.path;
+
   const userInput = { bio, profilePic };
 
   const [existingProfile, validationResult] = await Promise.all([
     prisma.profile.findUnique({
-      where: { userId: userId },
+      where: { userId },
+      select: {
+        id: true,
+        bio: true,
+        profilePic: true,
+      },
     }),
-    ProfileSchemas.editProfileSchema.safeParse(userInput)
-  ])
+    ProfileSchemas.editProfileSchema.safeParse(userInput),
+  ]);
 
   if (!existingProfile) {
     throw new ApiError(404, "Profile not found");
   }
 
   if (!validationResult.success) {
-    validationErrors(validationResult)
+    validationErrors(validationResult);
   }
 
-  let profilePicUrl: string | null = null
+  let profilePicUrl: string | null = null;
   if (userInput.profilePic) {
-    const uploaded = await uploadOnCloudinary(userInput.profilePic)
-    if (!uploaded || !uploaded?.url) {
-      throw new ApiError(400, "Error while uploading the profile pic")
+    const uploaded = await uploadOnCloudinary(userInput.profilePic);
+
+    if (!uploaded || !uploaded.url) {
+      throw new ApiError(400, "Error while uploading the profile pic");
     }
-    profilePicUrl = uploaded.url
+
+    profilePicUrl = uploaded.url;
+
+    if (existingProfile.profilePic) {
+      const publicId = existingProfile.profilePic
+        .split("?")[0]
+        .split("/")
+        .pop()
+        ?.replace(/\.[^/.]+$/, "");
+
+      if (publicId) {
+        const response = await deleteFromCloudinary(publicId);
+
+        if (response?.result !== "ok") {
+          console.error("Failed to delete old profile picture from Cloudinary");
+        }
+      }
+    }
   }
 
   const updatedProfile = await prisma.profile.update({
-    where: { userId: userId },
+    where: { userId },
     data: {
       bio: userInput.bio ?? existingProfile.bio,
       profilePic: profilePicUrl ?? existingProfile.profilePic,

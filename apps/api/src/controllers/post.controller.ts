@@ -9,12 +9,10 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { validationErrors } from '../utils/validationErrors.js';
-import { uploadOnCloudinary } from '../utils/cloudinary.js';
+import { uploadOnCloudinary, deleteFromCloudinary } from '../utils/cloudinary.js';
 
 import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 import { PostResult } from '../types/post.types.js';
-
-import { PostType } from '../generated/prisma/index.js';
 
 const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postType = req.params.postType
@@ -27,7 +25,7 @@ const createPost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
 
     const files = req.files as MulterFiles | undefined
     const mediaUrl = files?.media?.[0]?.path
-    
+
     const uploadMedia = async (filePath: string) => {
         const uploaded = await uploadOnCloudinary(filePath)
         if (!uploaded?.url) throw new ApiError(400, "Error while uploading media")
@@ -173,6 +171,7 @@ const deletePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
         select: {
             id: true,
             authorId: true,
+            mediaUrl: true,
         }
     })
 
@@ -180,8 +179,23 @@ const deletePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
 
     if (post.authorId !== req.user?.profile.id) throw new ApiError(403, "Unauthorized Request")
 
-    await prisma.post.delete({ where: { id: postId } });
+    if (post.mediaUrl) {
+        const publicId = post.mediaUrl
+            .split("?")[0]              
+            .split("/")
+            .pop()
+            ?.replace(/\.[^/.]+$/, ""); 
+        if (!publicId) {
+            throw new ApiError(400, "Invalid media URL");
+        }
 
+        const response = await deleteFromCloudinary(publicId);
+        if (response?.result !== "ok") {
+            throw new ApiError(500, "Error while deleting media");
+        }
+    }
+    await prisma.post.delete({ where: { id: postId } });
+    
     return res
         .status(200)
         .json(new ApiResponse(200, {}, "Post deleted successfully"))
@@ -333,7 +347,7 @@ const getPostById = asyncHandler(async (req: AuthenticatedRequest, res: Response
         totalLikes: post._count.postLikes,
         mediaUrl: post.mediaUrl,
         thumbnail: post.thumbnailUrl,
-        duration:post.duration,
+        duration: post.duration,
     });
 
     return res
@@ -491,7 +505,7 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
         totalLikes: post._count.postLikes,
         mediaUrl: post.mediaUrl,
         thumbnail: post.thumbnailUrl,
-        duration:post.duration,
+        duration: post.duration,
     });
 
     return res.status(200).json(
@@ -509,8 +523,8 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
     const type = req.params.type;
 
     if (!type) throw new ApiError(400, "Post type is required");
-    
-    const validationResult = PostSchemas.postTypeSchema.safeParse({type})
+
+    const validationResult = PostSchemas.postTypeSchema.safeParse({ type })
     if (!validationResult.success) validationErrors(validationResult)
 
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
@@ -610,7 +624,7 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
                         postLikes: true
                     }
                 },
-                
+
             }
         });
     }
@@ -628,10 +642,10 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
             profilePic: post.author.profilePic,
         },
         totalComments: post._count.comments,
-        totalLikes: post._count.postLikes, 
+        totalLikes: post._count.postLikes,
         mediaUrl: post.mediaUrl,
         thumbnail: post.thumbnailUrl,
-        duration:post.duration,
+        duration: post.duration,
     });
 
     return res.status(200).json(

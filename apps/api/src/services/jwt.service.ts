@@ -55,6 +55,22 @@ const generateForgotPasswordToken=(user:ForgotPasswordPayload):string=>{
   )
 }
 
+type completeProfilePayload=Pick<User,"id"|"email">
+
+const completeProfileToken=(user: completeProfilePayload):string=>{
+  const expiry=ENV.COMPLETE_PROFILE_TOKEN_EXPIRY as "1h"| "45m" |"30m"
+  return jwt.sign(
+    {
+      id:user.id,
+      email:user.email
+    },
+    ENV.COMPLETE_PROFILE_TOKEN_SECRET,
+    {
+      expiresIn:expiry
+    }
+  )
+}
+
 const generateAccessAndRefreshTokens = async (
   user: AccessTokenPayload
 ): Promise<{ accessToken: string; refreshToken: string }> => {
@@ -74,4 +90,5 @@ export {
   generateRefreshToken,
   generateAccessAndRefreshTokens,
   generateForgotPasswordToken,
+  completeProfileToken,
 }

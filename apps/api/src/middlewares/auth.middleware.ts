@@ -42,7 +42,7 @@ const verifyJWT = asyncHandler(async (req: Request, _: Response, next: NextFunct
     }
 })
 
-const verifyForgotPasswordToken = async (req: Request, res: Response, next: NextFunction) => {
+const verifyForgotPasswordToken = async (req: Request, _: Response, next: NextFunction) => {
     const token = req.cookies?.forgotPasswordToken || req.header("Authorization")?.replace("Bearer ", "")
     if (!token) {
         throw new ApiError(401, "Unathorized Request")
@@ -57,7 +57,23 @@ const verifyForgotPasswordToken = async (req: Request, res: Response, next: Next
     next()
 }
 
+const verifyCompleteProfileToken=async (req: Request, _: Response, next: NextFunction) => {
+    const token = req.cookies?.completeProfileToken || req.header("Authorization")?.replace("Bearer ", "")
+    if (!token) {
+        throw new ApiError(401, "Unathorized Request")
+    }
+
+    const decoded = jwt.verify(token, ENV.COMPLETE_PROFILE_TOKEN_SECRET) as jwt.JwtPayload;
+    if (typeof decoded !== "object" || !("email" in decoded)) {
+        throw new ApiError(401, "Invalid token payload");
+    }
+    
+    req.body.email=decoded.email;
+    next()
+}
+
 export {
     verifyJWT,
     verifyForgotPasswordToken,
+    verifyCompleteProfileToken,
 }

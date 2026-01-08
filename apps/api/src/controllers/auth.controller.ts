@@ -20,25 +20,25 @@ import { AuthSchemas } from "@repo/common/schemas";
 const signup = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
 
-    const [existedUser, validationResult] = await Promise.all([
-        prisma.user.findFirst({
-            where: {
-                OR: [
-                    { email: userInput.email },
-                    { username: userInput.username }
-                ],
-            },
-        }),
-        AuthSchemas.signupSchema.safeParse(userInput)
-    ])
+    const validationResult = AuthSchemas.signupSchema.safeParse(userInput)
+
+    if (!validationResult.success) {
+        validationErrors(validationResult)
+    }
+
+    const existedUser = prisma.user.findFirst({
+        where: {
+            OR: [
+                { email: userInput.email },
+                { username: userInput.username }
+            ],
+        },
+    })
 
     if (existedUser) {
         throw new ApiError(409, "User with the given username or email already exist")
     }
 
-    if (!validationResult.success) {
-        validationErrors(validationResult)
-    }
     const hashedPassword = await hashPassword(userInput.password)
 
     const user = await prisma.user.create({
@@ -46,9 +46,7 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
             fullName: userInput.fullName,
             username: userInput.username,
             email: userInput.email,
-            dateOfBirth: userInput.dateOfBirth,
             password: hashedPassword,
-            gender: userInput.gender,
             provider: "Credentials",
         }
     })
@@ -80,22 +78,19 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
 
 const signin = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
-
-    const [user, validationResult] = await Promise.all([
-        prisma.user.findUnique({
-            where: {
-                username: userInput.username
-            }
-        }),
-        AuthSchemas.signinSchema.safeParse(userInput)
-    ]);
-
-    if (!user) {
-        throw new ApiError(404, "User with the given username doesn't exist")
-    }
-
+    
+    const validationResult = AuthSchemas.signinSchema.safeParse(userInput)
     if (!validationResult.success) {
         validationErrors(validationResult)
+    }
+
+    const user = prisma.user.findUnique({
+        where: {
+            username: userInput.username
+        }
+    })
+    if (!user) {
+        throw new ApiError(404, "User with the given username doesn't exist")
     }
 
     if (!user.password) {
@@ -146,7 +141,7 @@ const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => 
             }
         });
     }
-    
+
     const options: CookieOptions = {
         httpOnly: true,
         secure: true,

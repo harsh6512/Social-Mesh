@@ -6,7 +6,7 @@ import { ENV } from '../constants/env.js';
 import { Request, Response, NextFunction } from 'express';
 import { sanitizeUser } from '../utils/sanitizeUser.js';
 
-export const verifyJWT = asyncHandler(async (req: Request, _: Response, next: NextFunction) => {
+const verifyJWT = asyncHandler(async (req: Request, _: Response, next: NextFunction) => {
     try {
         const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "")
         if (!token) throw new ApiError(401, "Unathorized request")
@@ -41,3 +41,23 @@ export const verifyJWT = asyncHandler(async (req: Request, _: Response, next: Ne
         throw new ApiError(401, "Something went wrong");
     }
 })
+
+const verifyForgotPasswordToken = async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.cookies?.forgotPasswordToken || req.header("Authorization")?.replace("Bearer ", "")
+    if (!token) {
+        throw new ApiError(401, "Unathorized Request")
+    }
+
+    const decoded = jwt.verify(token, ENV.FORGOTPASSWORD_TOKEN_SECRET) as jwt.JwtPayload;
+    if (typeof decoded !== "object" || !("email" in decoded)) {
+        throw new ApiError(401, "Invalid token payload");
+    }
+    
+    req.body.email=decoded.email;
+    next()
+}
+
+export {
+    verifyJWT,
+    verifyForgotPasswordToken,
+}

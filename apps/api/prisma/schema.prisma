@@ -13,8 +13,6 @@ model User {
   fullName     String       @db.VarChar(100)
   username     String       @unique @db.VarChar(30)
   email        String       @unique @db.VarChar(255)
-  gender       GenderType?
-  dateOfBirth  DateTime?
   password     String?
   google_id    String?      @unique
   refreshToken String?
@@ -151,12 +149,6 @@ enum NotificationType {
 enum ProviderType {
   Credentials
   Google
-}
-
-enum GenderType {
-  Male
-  Female
-  Other
 }
 
 enum IntentionType {

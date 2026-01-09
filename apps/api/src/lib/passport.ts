@@ -10,9 +10,8 @@ passport.use(new GoogleStrategy({
     clientSecret: ENV.GOOGLE_CLIENT_SECRET,
     callbackURL: ENV.GOOGLE_CALLBACK_URL,
     passReqToCallback: true,
-}, async (req, _accessToken, _refreshToken, profile, done) => {
-    const context = req.query.state as 'signin' | 'signup';
-    try {
+}, async (_req, _accessToken, _refreshToken, profile, done) => {
+   try {
         const email = profile.emails?.[0]?.value;
         if (!email) {
             return done(new ApiError(400, "Google account email not found"), undefined);
@@ -22,11 +21,7 @@ passport.use(new GoogleStrategy({
             where: { email: email }
         });
 
-        if (context === 'signup') {
-            if (user) {
-                return done(new ApiError(409, "User already exists"), undefined);
-            }
-
+        if (!user) {
             user = await prisma.user.create({
                 data: {
                     fullName: profile.displayName,
@@ -35,12 +30,6 @@ passport.use(new GoogleStrategy({
                     provider: "Google",
                 },
             });
-        }
-
-        if (context === 'signin') {
-            if (!user) {
-                return done(new ApiError(404, "User doesn't exist. Please signup"), undefined);
-            }
         }
 
         const safeUser = sanitizeUser(user);

@@ -29,8 +29,8 @@ const verifyJWT = asyncHandler(async (req: Request, _: Response, next: NextFunct
         if (!user.profile?.id) throw new ApiError(403, "Complete your profile to perform this action")
 
         const safeUser = {
-           ...sanitizeUser(user),
-          ...(decodedToken.deviceId && { deviceId: decodedToken.deviceId })
+            ...sanitizeUser(user),
+            ...(decodedToken.deviceId && { deviceId: decodedToken.deviceId })
         }
         req.user = safeUser;
         next();
@@ -47,30 +47,45 @@ const verifyForgotPasswordToken = async (req: Request, _: Response, next: NextFu
     if (!token) {
         throw new ApiError(401, "Unathorized Request")
     }
+    try {
+        const decoded = jwt.verify(token, ENV.FORGOTPASSWORD_TOKEN_SECRET) as jwt.JwtPayload;
+        if (typeof decoded !== "object" || !("email" in decoded)) {
+            throw new ApiError(401, "Invalid token payload");
+        }
 
-    const decoded = jwt.verify(token, ENV.FORGOTPASSWORD_TOKEN_SECRET) as jwt.JwtPayload;
-    if (typeof decoded !== "object" || !("email" in decoded)) {
-        throw new ApiError(401, "Invalid token payload");
+        req.body.email = decoded.email;
+        next();
+    } catch (error) {
+        if (error instanceof Error) {
+            throw new ApiError(401, error.message);
+        }
+        throw new ApiError(401, "Invalid or expired token");
     }
-    
-    req.body.email=decoded.email;
-    next()
 }
 
-const verifyCompleteProfileToken=async (req: Request, _: Response, next: NextFunction) => {
-    const token = req.cookies?.completeProfileToken || req.header("Authorization")?.replace("Bearer ", "")
+const verifyCompleteProfileToken = async (req: Request, _: Response, next: NextFunction) => {
+    const token = req.cookies?.completeProfileToken || req.header("Authorization")?.replace("Bearer ", "");
+
     if (!token) {
-        throw new ApiError(401, "Unathorized Request")
+        throw new ApiError(401, "Unauthorized Request");
     }
 
-    const decoded = jwt.verify(token, ENV.COMPLETE_PROFILE_TOKEN_SECRET) as jwt.JwtPayload;
-    if (typeof decoded !== "object" || !("email" in decoded)) {
-        throw new ApiError(401, "Invalid token payload");
+    try {
+        const decoded = jwt.verify(token, ENV.COMPLETE_PROFILE_TOKEN_SECRET) as jwt.JwtPayload;
+
+        if (typeof decoded !== "object" || !("email" in decoded)) {
+            throw new ApiError(401, "Invalid token payload");
+        }
+
+        req.body.email = decoded.email;
+        next();
+    } catch (error) {
+        if (error instanceof Error) {
+            throw new ApiError(401, error.message);
+        }
+        throw new ApiError(401, "Invalid or expired token");
     }
-    
-    req.body.email=decoded.email;
-    next()
-}
+};
 
 export {
     verifyJWT,

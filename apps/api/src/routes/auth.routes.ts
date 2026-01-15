@@ -14,18 +14,9 @@ router.route("/signup").post(signup)
 router.route("/signin").post(signin)
 router.route("/logout").post(verifyJWT, logout)
 
-router.get('/google/signin',
+router.get('/google',
   passport.authenticate('google', {
     scope: ['profile', 'email'],
-    state: 'signin',
-    prompt: 'consent',
-  })
-);
-
-router.get('/google/signup',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    state: 'signup',
     prompt: 'consent',
   })
 );

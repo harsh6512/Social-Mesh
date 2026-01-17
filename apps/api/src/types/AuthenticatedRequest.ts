@@ -7,3 +7,9 @@ export interface AuthenticatedRequest extends Request {
     deviceId:string;
   };
 }
+
+export interface OAuthRequest extends Request {
+  user: Omit<User, 'password' | 'refreshToken'> & {
+    profile: { id: number } | null;
+  };
+}

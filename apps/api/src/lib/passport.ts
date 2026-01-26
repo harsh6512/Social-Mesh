@@ -3,7 +3,24 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { prisma } from '../db/index.js'
 import { ENV } from '../constants/env.js';
 import { sanitizeUser } from '../utils/sanitizeUser.js';
-import { ApiError } from '../utils/ApiError.js';
+
+function generateUniqueUsername(email: string): string {
+    const emailPrefix = email.split('@')[0]; 
+
+    if (!emailPrefix) {
+        throw new Error("Invalid email format");
+    }
+
+    const base = emailPrefix
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .toLowerCase()
+        .slice(0, 12);
+
+    const timestamp = Date.now().toString().slice(-4);
+    const random = Math.floor(10 + Math.random() * 90);
+
+    return `${base}_${timestamp}${random}`;
+}
 
 passport.use(new GoogleStrategy({
     clientID: ENV.GOOGLE_CLIENT_ID,
@@ -11,24 +28,46 @@ passport.use(new GoogleStrategy({
     callbackURL: ENV.GOOGLE_CALLBACK_URL,
     passReqToCallback: true,
 }, async (_req, _accessToken, _refreshToken, profile, done) => {
-   try {
+    try {
         const email = profile.emails?.[0]?.value;
         if (!email) {
-            return done(new ApiError(400, "Google account email not found"), undefined);
+            return done(new Error("Google account email not found"), undefined);
         }
 
         let user = await prisma.user.findUnique({
-            where: { email: email }
+            where: { email: email },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                fullName: true,
+                profile: {
+                    select: {
+                        id: true
+                    }
+                }
+            }
         });
 
         if (!user) {
+            const username = generateUniqueUsername(email);
+
             user = await prisma.user.create({
                 data: {
                     fullName: profile.displayName,
                     email: email,
-                    username: profile.id,
+                    username: username,
+                    google_id: profile.id,
                     provider: "Google",
+                    password: null,
                 },
+                select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    fullName: true,
+                    profile: true
+                }
             });
         }
 
@@ -36,6 +75,7 @@ passport.use(new GoogleStrategy({
         return done(null, safeUser);
 
     } catch (err) {
-        return done(err as Error, undefined); 
+        console.error('OAuth error:', err);
+        return done(err as Error, undefined);
     }
 }));

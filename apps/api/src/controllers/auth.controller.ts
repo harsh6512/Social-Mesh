@@ -6,10 +6,11 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { sanitizeUser } from "../utils/sanitizeUser.js";
 import { validationErrors } from "../utils/validationErrors.js";
 
-import { AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
+import { OAuthRequest, AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
 
 import {
     generateAccessAndRefreshTokens,
+    completeProfileToken,
 } from "../services/jwt.service.js";
 import { comparePassword, hashPassword } from "../services/bcrypt.service.js";
 
@@ -78,7 +79,7 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
 
 const signin = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body
-    
+
     const validationResult = AuthSchemas.signinSchema.safeParse(userInput)
     if (!validationResult.success) {
         validationErrors(validationResult)
@@ -154,28 +155,49 @@ const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => 
         .json(new ApiResponse(200, {}, "User logged out successfully"))
 })
 
-const handleGoogleCallback = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+const handleGoogleCallback = asyncHandler(async (req: OAuthRequest, res: Response) => {
     const user = req.user;
 
-    if (!user) {
-        throw new ApiError(401, "Authentication failed")
+    if (!user) throw new ApiError(401, "Authentication failed");
+
+    if (!user.profile) {
+        const profileToken = completeProfileToken(user);
+
+        const options: CookieOptions = {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict',
+            maxAge: 15 * 60 * 1000,
+        };
+
+        return res
+            .status(200)
+            .cookie("completeProfileToken", profileToken, options)
+            .json(
+                new ApiResponse(200, { next: "COMPLETE_PROFILE", user:user }, "Complete your profile")
+            );
     }
 
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user)
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user);
+
+    await prisma.user.update({
+        where: { id: user.id },
+        data: { refreshToken }
+    });
 
     const options: CookieOptions = {
         httpOnly: true,
         secure: true,
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000,
-    }
+    };
 
     return res
         .status(200)
         .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", refreshToken, options)
-        .json(new ApiResponse(200, user, "User logged in successfully"))
-})
+        .json(new ApiResponse(200, { next: "HOME", user: user }, "User logged in successfully"));
+});
 
 export {
     signin,

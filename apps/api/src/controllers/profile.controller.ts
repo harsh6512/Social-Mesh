@@ -1,14 +1,19 @@
-import { Response } from 'express';
+import { Request, Response, CookieOptions } from 'express';
 import { ProfileSchemas } from '@repo/common/schemas';
 
 import { prisma } from '../db/index.js';
+import type { Prisma } from '@prisma/client';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { uploadOnCloudinary, deleteFromCloudinary } from '../utils/cloudinary.js';
 import { validationErrors } from '../utils/validationErrors.js';
+import {
+    generateAccessAndRefreshTokens,
+} from "../services/jwt.service.js";
 
 import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
+import { sanitizeUser } from '../utils/sanitizeUser.js';
 
 const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user?.id
@@ -141,76 +146,108 @@ const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response
     .json(new ApiResponse(200, updatedProfile, "The profile was updated successfully"));
 });
 
-const oauthCompleteProfile = asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const userId = req.user?.id
+const oauthCompleteProfile = asyncHandler(async (req: Request, res: Response) => {
+  const { username, email, bio } = req.body; 
+  const profilePicPath = req.file?.path;
 
-  const { bio, gender, dateOfBirth } = req.body;
-  const profilePic = req.file?.path;
-  const userInput = { bio, gender, dateOfBirth, profilePic };
+  if (!email) {
+    throw new ApiError(401, "Unauthorized request");
+  }
 
-  const [userWithProfile, validationResult] = await Promise.all([
-    prisma.user.findUnique({
-      where: {
-        id: userId,
-      },
-      select: {
-        provider: true,
+  const userInput = {
+    username,
+    bio,
+    profilePic: profilePicPath,
+  };
+
+  const validationResult = ProfileSchemas.oauthCompleteProfileSchema.safeParse(userInput);
+
+  if (!validationResult.success) validationErrors(validationResult);
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      username: true,
+      profile: { select: { id: true } },
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (user.profile) {
+    throw new ApiError(400, "Profile already completed");
+  }
+
+  // Determine final username: use provided or keep existing
+  const finalUsername = username?.toLowerCase() || user.username.toLowerCase();
+
+  // Check username uniqueness only if they're changing it
+  if (finalUsername !== user.username.toLowerCase()) {
+    const existingUser = await prisma.user.findUnique({
+      where: { username: finalUsername }
+    });
+
+    if (existingUser) {
+      throw new ApiError(409, "Username already taken");
+    }
+  }
+
+  let profilePicUrl: string | null = null;
+
+  if (profilePicPath) {
+    const uploaded = await uploadOnCloudinary(profilePicPath);
+
+    if (!uploaded?.url) {
+      throw new ApiError(400, "Error uploading profile picture");
+    }
+
+    profilePicUrl = uploaded.url;
+  }
+
+  const updatedUser = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    return tx.user.update({
+      where: { id: user.id },
+      data: {
+        username: finalUsername,
         profile: {
-          select: { id: true }
-        }
-      }
-    }),
-    ProfileSchemas.oauthCompleteProfileSchema.safeParse(userInput)
-  ])
+          create: {
+            bio,
+            profilePic: profilePicUrl,
+          },
+        },
+      },
+      include: {
+        profile: true,
+      },
+    });
+  });
 
-  if (!userWithProfile || userWithProfile.provider !== "Google") {
-    throw new ApiError(403, "Access denied: Google authentication required")
-  }
+  const safeUser = sanitizeUser(updatedUser);
+  const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(safeUser);
 
-  if (userWithProfile.profile) {
-    throw new ApiError(400, "You have already completed your profile")
-  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { refreshToken }
+  });
 
-  if (!validationResult.success) {
-    validationErrors(validationResult)
-  }
-
-  let profilePicUrl: string | null = null
-  if (userInput.profilePic) {
-    const uploaded = await uploadOnCloudinary(userInput.profilePic)
-    if (!uploaded || !uploaded?.url) {
-      throw new ApiError(400, "Error while uploading the profile pic")
-    }
-    profilePicUrl = uploaded.url
-  }
-
-  const profile = await prisma.user.update({
-    where: {
-      id: userId
-    },
-    data: {
-      gender: userInput.gender,
-      dateOfBirth: userInput.dateOfBirth,
-      profile: {
-        create: {
-          bio: userInput.bio,
-          profilePic: profilePicUrl
-        }
-      }
-    },
-    include: {
-      profile: true,
-    }
-  })
-
-  if (!profile) {
-    throw new ApiError(500, "Error while completing the profile")
-  }
+  const options: CookieOptions = {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  };
 
   return res
     .status(200)
-    .json(new ApiResponse(200, profile, "User profile completed successfully"))
-})
+    .clearCookie("completeProfileToken")
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(new ApiResponse(200, safeUser, "User profile completed successfully"));
+});
+
 
 const getMYProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user?.id

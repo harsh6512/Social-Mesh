@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
-import { verifyForgotPasswordToken } from "../middlewares/authForgetPasswordToken.middleware.js"
+import { verifyForgotPasswordToken } from "../middlewares/auth.middleware.js"
 import { otpLimiter } from "../middlewares/otpLimiter.middleware.js";
 import {
     forgotPassword,

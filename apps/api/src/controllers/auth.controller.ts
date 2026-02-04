@@ -85,7 +85,7 @@ const signin = asyncHandler(async (req: Request, res: Response) => {
         validationErrors(validationResult)
     }
 
-    const user = prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
         where: {
             username: userInput.username
         }
@@ -93,7 +93,7 @@ const signin = asyncHandler(async (req: Request, res: Response) => {
     if (!user) {
         throw new ApiError(404, "User with the given username doesn't exist")
     }
-
+  
     if (!user.password) {
         throw new ApiError(400, "This account was created using Google. Please sign in using Google.");
     }

@@ -27,7 +27,7 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
         validationErrors(validationResult)
     }
 
-    const existedUser = prisma.user.findFirst({
+    const existedUser = await prisma.user.findFirst({
         where: {
             OR: [
                 { email: userInput.email },
@@ -35,6 +35,8 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
             ],
         },
     })
+
+    console.log("How the fuck user is existing", existedUser)
 
     if (existedUser) {
         throw new ApiError(409, "User with the given username or email already exist")

@@ -1,20 +1,22 @@
 import { Request, Response, CookieOptions } from "express";
 
-import { asyncHandler } from "../utils/asyncHandler.js";
-import { ApiError } from "../utils/ApiError.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-import { sanitizeUser } from "../utils/sanitizeUser.js";
-import { validationErrors } from "../utils/validationErrors.js";
+import { prisma } from "../db/index.js";
 
-import { OAuthRequest, AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
+import { ENV } from "../constants/env.js";
 
 import {
-    generateAccessAndRefreshTokens,
-    completeProfileToken,
+  completeProfileToken,
+  generateAccessAndRefreshTokens,
 } from "../services/jwt.service.js";
 import { comparePassword, hashPassword } from "../services/bcrypt.service.js";
 
-import { prisma } from "../db/index.js";
+import { OAuthRequest, AuthenticatedRequest } from "../types/AuthenticatedRequest.js";
+
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { sanitizeUser } from "../utils/sanitizeUser.js";
+import { validationErrors } from "../utils/validationErrors.js";
 
 import { AuthSchemas } from "@repo/common/schemas";
 
@@ -95,7 +97,7 @@ const signin = asyncHandler(async (req: Request, res: Response) => {
     if (!user) {
         throw new ApiError(404, "User with the given username doesn't exist")
     }
-  
+
     if (!user.password) {
         throw new ApiError(400, "This account was created using Google. Please sign in using Google.");
     }
@@ -157,49 +159,50 @@ const logout = asyncHandler(async (req: AuthenticatedRequest, res: Response) => 
         .json(new ApiResponse(200, {}, "User logged out successfully"))
 })
 
-const handleGoogleCallback = asyncHandler(async (req: OAuthRequest, res: Response) => {
-    const user = req.user;
+const handleGoogleCallback = asyncHandler(
+    async (req: OAuthRequest, res: Response) => {
+        const user = req.user;
 
-    if (!user) throw new ApiError(401, "Authentication failed");
+        if (!user) throw new ApiError(401, "Authentication failed");
 
-    if (!user.profile) {
-        const profileToken = completeProfileToken(user);
+        const frontendUrl = ENV.FRONTEND_URL 
+
+        if (!user.profile) {
+            const profileToken = completeProfileToken(user);
+
+            const options: CookieOptions = {
+                httpOnly: true,
+                secure: true,
+                sameSite: "lax",
+                maxAge: 15 * 60 * 1000,
+            };
+
+            return res
+                .cookie("completeProfileToken", profileToken, options)
+                .redirect(`${frontendUrl}/complete-profile`);
+        }
+
+        const { accessToken, refreshToken } =
+            await generateAccessAndRefreshTokens(user);
+
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { refreshToken },
+        });
 
         const options: CookieOptions = {
             httpOnly: true,
             secure: true,
-            sameSite: 'strict',
-            maxAge: 15 * 60 * 1000,
+            sameSite: "lax",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
         };
 
         return res
-            .status(200)
-            .cookie("completeProfileToken", profileToken, options)
-            .json(
-                new ApiResponse(200, { next: "COMPLETE_PROFILE", user:user }, "Complete your profile")
-            );
+            .cookie("accessToken", accessToken, options)
+            .cookie("refreshToken", refreshToken, options)
+            .redirect(`${frontendUrl}/`);
     }
-
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user);
-
-    await prisma.user.update({
-        where: { id: user.id },
-        data: { refreshToken }
-    });
-
-    const options: CookieOptions = {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-    };
-
-    return res
-        .status(200)
-        .cookie("accessToken", accessToken, options)
-        .cookie("refreshToken", refreshToken, options)
-        .json(new ApiResponse(200, { next: "HOME", user: user }, "User logged in successfully"));
-});
+);
 
 export {
     signin,

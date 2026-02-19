@@ -38,4 +38,6 @@ export const ENV = {
 
   FIREBASE_ADMIN_API:getEnv("FIREBASE_ADMIN_API"),
   CORS_ORIGIN:getEnv("CORS_ORIGIN","*"),
+
+  FRONTEND_URL:getEnv("FRONTEND_URL"),
 };

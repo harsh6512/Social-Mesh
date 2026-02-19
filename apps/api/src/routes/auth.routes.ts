@@ -7,6 +7,7 @@ import {
   handleGoogleCallback,
 } from '../controllers/auth.controller.js'
 import { verifyJWT } from '../middlewares/auth.middleware.js';
+import { ENV } from '../constants/env.js';
 
 const router=Router()
 
@@ -23,7 +24,7 @@ router.get('/google',
 
 router.get('/google/callback', passport.authenticate('google', {
     session: false,
-    failureRedirect: '',
+    failureRedirect: `${ENV.FRONTEND_URL}/login`,
 }), handleGoogleCallback)
 
 export default router

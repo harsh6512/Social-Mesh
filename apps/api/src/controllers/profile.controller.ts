@@ -16,60 +16,84 @@ import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 import { sanitizeUser } from '../utils/sanitizeUser.js';
 
 const completeProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const userId = req.user?.id
+  const userId = req.user?.id;
 
-  const bio = req.body.bio ?? {}
-  const profilePic = req.file?.path
-  const userInput = { bio, profilePic };
-  const [userWithProfile, validationResult] = await Promise.all([prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      provider: true,
-      profile: {
-        select: { id: true }
-      }
-    }
-  }),
-  ProfileSchemas.completeProfileSchema.safeParse(userInput)
-  ])
-
-  if (!userWithProfile || userWithProfile.provider !== "Credentials") {
-    throw new ApiError(403, "This route is only accessible for users who signed up with email/password");
+  if (!userId) {
+    throw new ApiError(401, "Unauthorized");
   }
 
-  if (userWithProfile.profile) {
-    throw new ApiError(400, "You have already completed your profile");
+  const bio = req.body.bio ?? null;
+  const profilePicPath = req.file?.path;
+
+  const userInput = { bio, profilePic: profilePicPath };
+
+  const [userWithProfile, validationResult] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        provider: true,
+        profile: {
+          select: {
+            id: true,
+            bio: true,
+            profilePic: true
+          }
+        }
+      }
+    }),
+    ProfileSchemas.completeProfileSchema.safeParse(userInput)
+  ]);
+
+  if (!userWithProfile) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (userWithProfile.provider !== "Credentials") {
+    throw new ApiError(
+      403,
+      "This route is only accessible for users who signed up with email/password"
+    );
   }
 
   if (!validationResult.success) {
-    validationErrors(validationResult)
+    validationErrors(validationResult);
   }
 
-  let profilePicUrl: string | null = null
-  if (userInput.profilePic) {
-    const uploaded = await uploadOnCloudinary(userInput.profilePic)
-    if (!uploaded || !uploaded?.url) {
-      throw new ApiError(400, "Error while uploading the profile pic")
+  if (
+    userWithProfile.profile?.bio ||
+    userWithProfile.profile?.profilePic
+  ) {
+    throw new ApiError(400, "You have already completed your profile");
+  }
+
+  let profilePicUrl: string | null = null;
+
+  if (profilePicPath) {
+    const uploaded = await uploadOnCloudinary(profilePicPath);
+
+    if (!uploaded || !uploaded.url) {
+      throw new ApiError(400, "Error while uploading the profile pic");
     }
-    profilePicUrl = uploaded.url
+
+    profilePicUrl = uploaded.url;
   }
 
-  const profile = await prisma.profile.create({
-    data: {
-      userId: userId,
-      bio: userInput.bio,
-      profilePic: profilePicUrl,
+  const updatedProfile = await prisma.profile.update({
+    where: {
+      userId: userId
     },
+    data: {
+      bio: bio,
+      profilePic: profilePicUrl
+    }
   });
-
-  if (!profile) {
-    throw new ApiError(500, "Error while completing the profile")
-  }
 
   return res
     .status(200)
-    .json(new ApiResponse(200, profile, "The profile completed successfully"))
-})
+    .json(
+      new ApiResponse(200, updatedProfile, "Profile completed successfully")
+    );
+});
 
 const editProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user?.id;

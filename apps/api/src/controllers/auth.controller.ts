@@ -21,12 +21,12 @@ import { validationErrors } from "../utils/validationErrors.js";
 import { AuthSchemas } from "@repo/common/schemas";
 
 const signup = asyncHandler(async (req: Request, res: Response) => {
-    const userInput = req.body
+    const userInput = req.body;
 
-    const validationResult = AuthSchemas.signupSchema.safeParse(userInput)
+    const validationResult = AuthSchemas.signupSchema.safeParse(userInput);
 
     if (!validationResult.success) {
-        validationErrors(validationResult)
+        validationErrors(validationResult);
     }
 
     const existedUser = await prisma.user.findFirst({
@@ -36,15 +36,13 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
                 { username: userInput.username }
             ],
         },
-    })
-
-    console.log("How the fuck user is existing", existedUser)
+    });
 
     if (existedUser) {
-        throw new ApiError(409, "User with the given username or email already exist")
+        throw new ApiError(409, "User with the given username or email already exist");
     }
 
-    const hashedPassword = await hashPassword(userInput.password)
+    const hashedPassword = await hashPassword(userInput.password);
 
     const user = await prisma.user.create({
         data: {
@@ -53,23 +51,30 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
             email: userInput.email,
             password: hashedPassword,
             provider: "Credentials",
+            profile: {
+                create: {} 
+            }
+        },
+        include: {
+            profile: true
         }
-    })
+    });
 
     if (!user) {
-        throw new ApiError(500, "Something Went wrong while signing up")
+        throw new ApiError(500, "Something went wrong while signing up");
     }
 
-    const safeUser = sanitizeUser(user)
-    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(safeUser)
+    const safeUser = sanitizeUser(user);
 
+    const { accessToken, refreshToken } =
+        await generateAccessAndRefreshTokens(safeUser);
 
     const options: CookieOptions = {
         httpOnly: true,
         secure: true,
-        sameSite: 'strict',
+        sameSite: "strict",
         maxAge: 7 * 24 * 60 * 60 * 1000,
-    }
+    };
 
     return res
         .status(200)
@@ -77,9 +82,8 @@ const signup = asyncHandler(async (req: Request, res: Response) => {
         .cookie("refreshToken", refreshToken, options)
         .json(
             new ApiResponse(200, safeUser, "User signed up successfully")
-        )
-
-})
+        );
+});
 
 const signin = asyncHandler(async (req: Request, res: Response) => {
     const userInput = req.body

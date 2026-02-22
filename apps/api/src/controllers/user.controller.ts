@@ -40,12 +40,17 @@ const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
     if (!user) {
         throw new ApiError(404, "User with given email doesn't exist")
     }
+
+    if (!user.password) {
+        throw new ApiError(400, "This account uses Google Sign-In. Please login with Google instead.")
+    }
+    
     const safeUser = sanitizeUser(user)
 
     if (!validationResult.success) {
         validationErrors(validationResult)
     }
-    
+
     const OTP = generateOTP();
 
     const otpkey = `forgot-password:${safeUser.email}`;

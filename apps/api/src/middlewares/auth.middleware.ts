@@ -26,8 +26,6 @@ const verifyJWT = asyncHandler(async (req: Request, _: Response, next: NextFunct
         })
         if (!user) throw new ApiError(401, "Invalid Access Token")
 
-        if (!user.profile?.id) throw new ApiError(403, "Complete your profile to perform this action")
-
         const safeUser = {
             ...sanitizeUser(user),
             ...(decodedToken.deviceId && { deviceId: decodedToken.deviceId })

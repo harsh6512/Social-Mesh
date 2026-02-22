@@ -12,8 +12,8 @@ import {
 } from "../controllers/user.controller.js";
 const router = Router()
 
-router.route("/forgot-password").post(otpLimiter,forgotPassword)
-router.route("/verify-OTP").post(verifyForgotPasswordToken, verifyOTP)
+router.route("/forgot-password").post(forgotPassword)
+router.route("/verify-OTP").post(otpLimiter,verifyForgotPasswordToken, verifyOTP)
 router.route("/reset-password").post(verifyForgotPasswordToken, resetPassword)
 router.route("/refresh-token").post(refreshAccessToken)
 router.route("/current-user").get(verifyJWT, getCurrentUser)

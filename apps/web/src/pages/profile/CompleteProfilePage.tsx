@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import avatarPlaceholder from "../../assets/avatar-placeholder.png";
@@ -18,8 +18,13 @@ const CompleteProfilePage = () => {
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [profilePic, setProfilePic] = useState("");
-
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (isGoogle && authUser?.username) {
+      setUsername(authUser.username);
+    }
+  }, [isGoogle, authUser]);
 
   const { mutate: completeProfile, isPending } = useMutation<
     void,
@@ -68,6 +73,7 @@ const CompleteProfilePage = () => {
         toast.error(error.message);
         return;
       }
+
       handleApiError(error);
     },
   });
@@ -76,7 +82,6 @@ const CompleteProfilePage = () => {
     e.preventDefault();
     setFieldErrors({});
 
-    // ✅ Build the correct payload based on provider
     const data: GoogleProfileData | NormalProfileData = isGoogle
       ? { username, bio, profilePic }
       : { bio, profilePic };
@@ -122,6 +127,7 @@ const CompleteProfilePage = () => {
               disabled={isPending}
               className="file-input file-input-bordered file-input-primary w-full max-w-xs rounded-full"
             />
+
             {fieldErrors.profilePic && (
               <p className="text-error text-sm">{fieldErrors.profilePic}</p>
             )}
@@ -145,7 +151,9 @@ const CompleteProfilePage = () => {
                 }`}
               />
               {fieldErrors.username && (
-                <p className="text-error text-sm mt-1">{fieldErrors.username}</p>
+                <p className="text-error text-sm mt-1">
+                  {fieldErrors.username}
+                </p>
               )}
             </div>
           )}
@@ -167,7 +175,9 @@ const CompleteProfilePage = () => {
               rows={4}
             />
             {fieldErrors.bio && (
-              <p className="text-error text-sm mt-1">{fieldErrors.bio}</p>
+              <p className="text-error text-sm mt-1">
+                {fieldErrors.bio}
+              </p>
             )}
           </div>
 

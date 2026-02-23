@@ -6,4 +6,4 @@ export const oauthCompleteProfileSchema=z.object({
     profilePic:z.string().optional(),
 })
 
-export type googleCompleteProfileData=z.infer<typeof oauthCompleteProfileSchema>
+export type oauthCompleteProfileData=z.infer<typeof oauthCompleteProfileSchema>

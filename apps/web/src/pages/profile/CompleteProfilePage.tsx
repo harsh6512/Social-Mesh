@@ -68,7 +68,6 @@ const CompleteProfilePage = () => {
         toast.error(error.message);
         return;
       }
-
       handleApiError(error);
     },
   });

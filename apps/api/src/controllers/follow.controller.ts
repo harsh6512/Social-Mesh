@@ -10,32 +10,26 @@ import { AuthenticatedRequest } from '../types/AuthenticatedRequest.js';
 import { sendNotification } from '../services/sendNotification.js'
 
 const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const followerId = req.user?.id;
+    const followerProfileId = req.user.profile.id;
+    
     const followingIdParam = req.params.id;
-    if (!followingIdParam) {
-        throw new ApiError(400, "Following ID is required");
-    }
-    const followingId = parseInt(followingIdParam);
-    if (isNaN(followingId)) {
-        throw new ApiError(400, "Invalid following ID");
-    }
+    if (!followingIdParam) throw new ApiError(400, "Following ID is required");
+    
+    const followingProfileId = parseInt(followingIdParam);
+    if (isNaN(followingProfileId)) throw new ApiError(400, "Invalid following ID");
 
-    if (followerId === followingId) throw new ApiError(400, "You cannot follow yourself");
+    if (followerProfileId === followingProfileId) throw new ApiError(400, "You cannot follow yourself");
 
     const followingProfile = await prisma.profile.findUnique({
-        where: { userId: followingId },
+        where: { id: followingProfileId },
         select: {
             id: true,
-            userId: true
+            userId: true,
         }
-    })
+    });
 
-    if (!followingProfile?.id) {
-        throw new ApiError(404, "Following profile not found");
-    }
+    if (!followingProfile) throw new ApiError(404, "Following profile not found");
 
-    const followerProfileId = req.user.profile.id;
-    const followingProfileId = followingProfile.id;
     const existingFollow = await prisma.follow.findUnique({
         where: {
             followerId_followingId: {
@@ -70,12 +64,10 @@ const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: R
     const tokens = await prisma.fcmToken.findMany({
         where: {
             userId: followingProfile.userId,
-            isActive: true
+            isActive: true,
         },
-        select: {
-            token: true,
-        }
-    })
+        select: { token: true }
+    });
 
     await sendNotification(
         tokens,
@@ -85,7 +77,7 @@ const followUnfollowUser = asyncHandler(async (req: AuthenticatedRequest, res: R
             senderId: req.user.id,
             recipientId: followingProfile.userId,
         }
-    )
+    );
 
     return res
         .status(200)

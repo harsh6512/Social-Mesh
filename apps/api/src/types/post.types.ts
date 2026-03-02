@@ -10,6 +10,7 @@ export type PostResult = {
       username: string;
     };
   };
+  postLikes?: { id: number }[];
   _count: { // Optional: not every time count will be selected in query
     comments: number;
     postLikes: number;

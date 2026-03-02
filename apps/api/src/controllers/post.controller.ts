@@ -417,6 +417,10 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
                 isPublished: true,
                 caption: true,
                 createdAt: true,
+                postLikes: {
+                    where: { authorId: userProfileId },
+                    select: { id: true }
+                },
                 author: {
                     select: {
                         profilePic: true,
@@ -458,6 +462,10 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
                 isPublished: true,
                 caption: true,
                 createdAt: true,
+                postLikes: {
+                    where: { authorId: userProfileId },
+                    select: { id: true }
+                },
                 author: {
                     select: {
                         profilePic: true,
@@ -472,6 +480,7 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
                         postLikes: true
                     }
                 },
+
                 mediaUrl: true,
                 thumbnailUrl: true,
                 duration: true,
@@ -481,7 +490,7 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
     const hasNextPage = posts.length > limit;
     const trimmedPosts = hasNextPage ? posts.slice(0, limit) : posts;
     const nextCursor = hasNextPage ? trimmedPosts[trimmedPosts.length - 1]?.id : null;
-
+    console.log(posts)
     const formattedPost = (post: PostResult) => ({
         id: post.id,
         type: post.type,
@@ -491,6 +500,7 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
             username: post.author.user.username,
             profilePic: post.author.profilePic,
         },
+        isLiked: (post.postLikes?.length ?? 0) > 0,
         totalComments: post._count.comments,
         totalLikes: post._count.postLikes,
         mediaUrl: post.mediaUrl,
@@ -550,6 +560,10 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
                 isPublished: true,
                 caption: true,
                 createdAt: true,
+                postLikes: {
+                    where: { authorId: userProfileId },
+                    select: { id: true }
+                },
                 author: {
                     select: {
                         profilePic: true,
@@ -593,6 +607,10 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
                 isPublished: true,
                 caption: true,
                 createdAt: true,
+                postLikes: {
+                    where: { authorId: userProfileId },
+                    select: { id: true }
+                },
                 author: {
                     select: {
                         profilePic: true,
@@ -624,6 +642,7 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
             username: post.author.user.username,
             profilePic: post.author.profilePic,
         },
+        isLiked: (post.postLikes?.length ?? 0) > 0,
         totalComments: post._count.comments,
         totalLikes: post._count.postLikes,
         mediaUrl: post.mediaUrl,

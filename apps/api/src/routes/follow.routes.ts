@@ -6,8 +6,6 @@ import {
     getFollowing,
     removeFollower,
     getFollowSuggestions,
-    getFollowersByIntention,
-    getFollowingByIntention,
     followStatus,
 } from '../controllers/follow.controller.js'
 
@@ -17,7 +15,5 @@ router.route('/:id/followers').get(verifyJWT, getFollowers);
 router.route('/:id/following').get(verifyJWT, getFollowing);
 router.route('/followers/:id').delete(verifyJWT, removeFollower);
 router.route('/suggestions').get(verifyJWT, getFollowSuggestions);
-router.route('/:id/followers/:intention').get(verifyJWT, getFollowersByIntention);
-router.route('/:id/following/:intention').get(verifyJWT, getFollowingByIntention);
 router.route('/:id/follow-status').get(verifyJWT, followStatus);
 export default router

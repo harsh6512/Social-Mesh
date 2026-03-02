@@ -102,7 +102,6 @@ model Follow {
   id          Int           @id @default(autoincrement())
   followerId  Int
   followingId Int
-  intention   IntentionType
   createdAt   DateTime      @default(now())
 
   follower  Profile @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
@@ -149,15 +148,6 @@ enum NotificationType {
 enum ProviderType {
   Credentials
   Google
-}
-
-enum IntentionType {
-  Friendship
-  Dating
-  Networking
-  Open
-  Quick_Connect
-  Unspecified
 }
 
 enum PostType {

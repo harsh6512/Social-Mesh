@@ -181,10 +181,10 @@ const deletePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
 
     if (post.mediaUrl) {
         const publicId = post.mediaUrl
-            .split("?")[0]              
+            .split("?")[0]
             .split("/")
             .pop()
-            ?.replace(/\.[^/.]+$/, ""); 
+            ?.replace(/\.[^/.]+$/, "");
         if (!publicId) {
             throw new ApiError(400, "Invalid media URL");
         }
@@ -195,7 +195,7 @@ const deletePost = asyncHandler(async (req: AuthenticatedRequest, res: Response)
         }
     }
     await prisma.post.delete({ where: { id: postId } });
-    
+
     return res
         .status(200)
         .json(new ApiResponse(200, {}, "Post deleted successfully"))
@@ -390,13 +390,11 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
     const cursorParam = req.query.cursor as string | undefined;
 
     const cursor = cursorParam ? parseInt(cursorParam) : undefined;
-    if (cursorParam && isNaN(cursor!)) throw new ApiError(400, "Invalid cursor Id");
 
     const redisKey = `user:${userProfileId}:followingFeedDone`;
     let followingFeedDone = await redis.get(redisKey);
     let posts: PostResult[] = [];
 
-    // Get posts from people user follows
     if (followingFeedDone !== "true") {
         posts = await prisma.post.findMany({
             take: limit + 1,
@@ -439,13 +437,12 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
             }
         });
 
-        //If all the following posts is fetched mark as done
         if (posts.length <= limit) {
             await redis.set(redisKey, 'true', 'EX', 3600); // expires in 1 hour
+            followingFeedDone = 'true';
         }
     }
 
-    //If the following posts are fetched then fetch more post
     if (followingFeedDone === "true" || posts.length === 0) {
         posts = await prisma.post.findMany({
             take: limit + 1,
@@ -454,13 +451,6 @@ const getHomePosts = asyncHandler(async (req: AuthenticatedRequest, res: Respons
             orderBy: { createdAt: "desc" },
             where: {
                 isPublished: true,
-                author: {
-                    followers: {
-                        none: {
-                            followerId: userProfileId
-                        }
-                    }
-                }
             },
             select: {
                 id: true,
@@ -596,13 +586,6 @@ const getHomePostsByType = asyncHandler(async (req: AuthenticatedRequest, res: R
             where: {
                 isPublished: true,
                 type: type,
-                author: {
-                    followers: {
-                        none: {
-                            followerId: userProfileId
-                        }
-                    }
-                }
             },
             select: {
                 id: true,

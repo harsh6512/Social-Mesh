@@ -221,6 +221,7 @@ const getPostLikes = asyncHandler(async (req: AuthenticatedRequest, res: Respons
                     user: {
                         select: {
                             username: true,
+                            fullName: true,
                         }
                     }
                 }
@@ -244,6 +245,7 @@ const getPostLikes = asyncHandler(async (req: AuthenticatedRequest, res: Respons
             profilePic: string | null
             user: {
                 username: string,
+                fullName: string,
             }
         }
     }
@@ -251,7 +253,8 @@ const getPostLikes = asyncHandler(async (req: AuthenticatedRequest, res: Respons
     const formatedlikes = paginatedLikes.map((like: likesResult) => ({
         id: like.id,
         username: like.author.user.username,
-        profilePic: like.author.profilePic
+        profilePic: like.author.profilePic,
+        fullName: like.author.user.fullName
     }));
 
     return res

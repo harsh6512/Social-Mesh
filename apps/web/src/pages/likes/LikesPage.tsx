@@ -10,6 +10,7 @@ import { handleApiError } from "../../lib/handleApiError";
 import avatarPlaceholder from "../../assets/avatar-placeholder.png";
 
 import type { LikesResponse } from "../../types/likes.types";
+import { LikesSkeleton } from "../../components/skeletons/LikesSkeleton";
 
 const LIMIT = 10;
 
@@ -77,21 +78,46 @@ const LikesPage = () => {
 
 	/* ========================================= */
 
-	if (isLoading)
-		return (
-			<div className="flex justify-center py-10">
-				<span className="loading loading-spinner loading-md" />
+	if (isLoading) {
+	return (
+		<div className="flex justify-center w-full min-h-screen bg-base-100">
+			<div className="w-full max-w-2xl border-x border-gray-800">
+				
+				{/* HEADER */}
+				<div className="sticky top-0 z-20 backdrop-blur bg-base-100/80 border-b border-gray-800">
+					<div className="px-6 py-5 flex items-center justify-center relative">
+						<Link
+							to="/"
+							className="absolute left-6 p-2 rounded-full hover:bg-base-200 transition"
+						>
+							<ArrowLeft size={22} />
+						</Link>
+						<h1 className="text-2xl font-bold tracking-wide">Likes</h1>
+					</div>
+				</div>
+
+				<LikesSkeleton />
 			</div>
-		);
+		</div>
+	);
+}
 
 	if (error) {
-		return (
-			<div className="flex flex-col items-center justify-center py-10 text-center">
-				<p className="text-error font-medium">Failed to load likes.</p>
-				<p className="text-sm opacity-60">Please try again later.</p>
+	return (
+		<div className="flex justify-center w-full min-h-screen bg-base-100">
+			<div className="w-full max-w-2xl border-x border-gray-800 flex items-center justify-center">
+				<div className="flex flex-col items-center text-center gap-2">
+					<p className="text-error font-medium text-lg">
+						Failed to load likes.
+					</p>
+					<p className="text-sm opacity-60">
+						Please try again later.
+					</p>
+				</div>
 			</div>
-		);
-	}
+		</div>
+	);
+}
 
 	const likes = data?.pages.flatMap((page: LikesResponse) => page.likes) ?? [];
 

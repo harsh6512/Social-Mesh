@@ -96,93 +96,6 @@ const likeUnlikePost = asyncHandler(async (req: AuthenticatedRequest, res: Respo
         .json(new ApiResponse(200, {}, "Post unliked successfully"))
 });
 
-const likeUnlikeComment = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const commentIdParam = req.params.commentId
-    if (!commentIdParam) throw new ApiError(400, "Comment id is required")
-
-    const commentId = parseInt(commentIdParam)
-    if (isNaN(commentId)) throw new ApiError(400, "Invalid comment id")
-
-    const comment = await prisma.comment.findUnique({
-        where: {
-            id: commentId,
-        },
-        select: {
-            id: true,
-            postId: true,
-            author: {
-                select: {
-                    id: true,
-                    userId: true
-                }
-            }
-        }
-    })
-
-    if (!comment) throw new ApiError(404, "Comment not found")
-
-    const isLiked = await prisma.commentLike.findUnique({
-        where: {
-            authorId_commentId: {
-                authorId: req.user.profile.id,
-                commentId: commentId,
-            }
-        },
-        select: { id: true }
-    })
-
-    if (!isLiked) {
-        await prisma.commentLike.create({
-            data: {
-                authorId: req.user.profile.id,
-                commentId: commentId,
-            }
-        })
-
-        if (comment.author.userId !== req.user.id) {
-            const tokens = await prisma.fcmToken.findMany({
-                where: {
-                    userId: comment.author.userId,//finding the token for the author of the comment
-                    isActive: true
-                },
-                select: {
-                    token: true,
-                }
-            })
-
-            const tokenStrings = tokens.map((t: { token: string }) => t.token)
-
-            await sendNotification(
-                tokenStrings,
-                {
-                    type: "Like",
-                    message: `${req.user.username} liked your comment`,
-                    postId: comment.postId,
-                    senderId: req.user.id,
-                    recipientId: comment.author.userId,
-                }
-            )
-        }
-
-        return res
-            .status(200)
-            .json(new ApiResponse(200, {}, "Comment liked successfully"))
-    }
-
-    await prisma.commentLike.delete({
-        where: {
-            authorId_commentId: {
-                authorId: req.user.profile.id,
-                commentId: commentId,
-            }
-        }
-    })
-
-    return res
-        .status(200)
-        .json(new ApiResponse(200, {}, "Comment unliked successfully"))
-})
-
 const getPostLikes = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postIdParam = req.params.postId
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 50)
@@ -341,7 +254,6 @@ const getUserLikedPosts = asyncHandler(async (req: AuthenticatedRequest, res: Re
 
 export {
     likeUnlikePost,
-    likeUnlikeComment,
     getPostLikes,
     getUserLikedPosts,
 }

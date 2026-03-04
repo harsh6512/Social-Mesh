@@ -3,6 +3,7 @@ export type CommentResult = {
   id: number,
   content: string,
   createdAt:Date,
+  authorId : number,
   post?: {
     isPublished: boolean
   },

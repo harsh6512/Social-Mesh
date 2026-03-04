@@ -127,60 +127,6 @@ const deleteComment = asyncHandler(async (req: AuthenticatedRequest, res: Respon
         .json(new ApiResponse(200, {}, "Comment deleted successfully"))
 })
 
-const editComment = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-    const commentIdParam = req.params.commentId
-    const { content } = req.body
-
-    if (!commentIdParam) throw new ApiError(400, "Comment id is required")
-
-    const commentId = parseInt(commentIdParam)
-    if (isNaN(commentId)) throw new ApiError(400, "Invalid comment id")
-
-    const [comment, validationResult] = await Promise.all([
-        prisma.comment.findUnique({
-            where: {
-                id: commentId,
-            },
-            select: {
-                id: true,
-                authorId: true,
-                post: {
-                    select: {
-                        isPublished: true,
-                    }
-                }
-            }
-        }),
-        CommentSchemas.commentSchema.safeParse({ content })
-    ])
-
-    if (!validationResult.success) validationErrors(validationResult)
-
-    if (!comment || comment.post?.isPublished !== true) {
-        throw new ApiError(404, "Comment not found")
-    }
-
-    if (comment.authorId !== req.user.profile.id) {
-        throw new ApiError(403, "Unauthorized Request")
-    }
-
-    await prisma.comment.update({
-        where: {
-            id: commentId,
-        },
-        data: {
-            content,
-        },
-        select: {
-            id: true,
-        }
-    })
-
-    return res
-        .status(200)
-        .json(new ApiResponse(200, { commentId: comment.id }, "Comment updated successfully"))
-})
-
 const getCommentById = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const commentIdParam = req.params.commentId
 
@@ -236,7 +182,7 @@ const getCommentById = asyncHandler(async (req: AuthenticatedRequest, res: Respo
 
 const getPostComments = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
     const postIdParam = req.params.postId
-    const limit = Math.min(parseInt(req.query.limit as string) | 10, 50)
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50)
     const cursorParam = req.query.cursor as string | undefined
 
     if (!postIdParam) throw new ApiError(400, "Post id param is required")
@@ -272,6 +218,7 @@ const getPostComments = asyncHandler(async (req: AuthenticatedRequest, res: Resp
             id: true,
             content: true,
             createdAt: true,
+            authorId:true,
             author: {
                 select: {
                     profilePic: true,
@@ -293,6 +240,7 @@ const getPostComments = asyncHandler(async (req: AuthenticatedRequest, res: Resp
         id: comment.id,
         content: comment.content,
         createdAt: comment.createdAt,
+        isOwner:comment.authorId == req.user.profile.id,
         author: {
             username: comment.author.user.username,
             profilePic: comment.author.profilePic,
@@ -307,7 +255,6 @@ const getPostComments = asyncHandler(async (req: AuthenticatedRequest, res: Resp
 export {
     postComment,
     deleteComment,
-    editComment,
     getCommentById,
     getPostComments,
 }
